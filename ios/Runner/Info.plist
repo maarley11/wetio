@@ -56,5 +56,9 @@
 	<string>Cette application nécessite l'accès au microphone lors de l'utilisation de la caméra pour l'enregistrement de vidéos éventuelles.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Cette application utilise votre position pour rechercher des partenaires de livraison et des produits disponibles à proximité de chez vous.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Cette application utilise votre position pour rechercher des partenaires de livraison et des produits disponibles à proximité de chez vous, même en arrière-plan.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Cette application utilise votre position pour rechercher des partenaires de livraison et des produits disponibles à proximité de chez vous en arrière-plan.</string>
 </dict>
 </plist>
