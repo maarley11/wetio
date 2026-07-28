@@ -103,7 +103,11 @@ class _PhotoSectionWidgetState extends State<PhotoSectionWidget> {
 
   Future<void> _pickFromGallery() async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage();
+      final List<XFile> images = await _picker.pickMultiImage(
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
       if (images.isNotEmpty) {
         final updatedImages = List<XFile>.from(widget.selectedImages)
           ..addAll(images);
