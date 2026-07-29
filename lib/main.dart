@@ -14,7 +14,7 @@ void main() async {
   // Initialize Stripe
   const stripePublishableKey = String.fromEnvironment(
     'STRIPE_PUBLISHABLE_KEY',
-    defaultValue: '',
+    defaultValue: 'pk_test_oKhSR5nslBRnBZpjO6KuzZeX',
   );
   if (stripePublishableKey.isNotEmpty) {
     Stripe.publishableKey = stripePublishableKey;

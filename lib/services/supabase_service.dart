@@ -419,11 +419,12 @@ class SupabaseService {
 
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://zjcnggoxjyonahoiansk.supabase.co',
   );
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: '',
+    defaultValue:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqY25nZ294anlvbmFob2lhbnNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxMDg4NzksImV4cCI6MjA3NDY4NDg3OX0.ECbaWk_cl6VNCrodLwvAzMDWk3gO5UfkmKS6Ca4Qg2E',
   );
 
   // Initialize Supabase - call this in main()

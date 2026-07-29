@@ -10,7 +10,7 @@ class TokenService {
 
   final Dio _dio = Dio();
   final String _baseUrl =
-      '${String.fromEnvironment('SUPABASE_URL', defaultValue: '')}/functions/v1';
+      '${String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://zjcnggoxjyonahoiansk.supabase.co')}/functions/v1';
 
   /// Get current user token balance with improved null safety
   Future<int> getCurrentTokenBalance() async {
