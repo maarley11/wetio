@@ -1468,99 +1468,70 @@ class SupabaseService {
   /// Add a product to favorites
   static Future<void> addFavorite(String productId) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
+      final prefs = await SharedPreferences.getInstance();
+      final localFavs = prefs.getStringList('wetio_favorites') ?? [];
+      if (!localFavs.contains(productId)) {
+        localFavs.add(productId);
+        await prefs.setStringList('wetio_favorites', localFavs);
+      }
+    } catch (_) {}
 
-      print('❤️ Adding favorite: Product=$productId for User=$userId');
-      await Supabase.instance.client.from('favorites').insert({
-        'user_id': userId,
-        'product_id': productId,
-      });
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        await Supabase.instance.client.from('favorites').insert({
+          'user_id': userId,
+          'product_id': productId,
+        });
+      }
     } catch (e) {
-      print('❌ Error adding favorite: $e');
-      throw Exception('Failed to add favorite: $e');
+      print('❌ Error adding favorite to Supabase: $e');
     }
   }
 
   /// Remove a product from favorites
   static Future<void> removeFavorite(String productId) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
+      final prefs = await SharedPreferences.getInstance();
+      final localFavs = prefs.getStringList('wetio_favorites') ?? [];
+      localFavs.remove(productId);
+      await prefs.setStringList('wetio_favorites', localFavs);
+    } catch (_) {}
 
-      await Supabase.instance.client
-          .from('favorites')
-          .delete()
-          .eq('user_id', userId)
-          .eq('product_id', productId);
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        await Supabase.instance.client
+            .from('favorites')
+            .delete()
+            .eq('user_id', userId)
+            .eq('product_id', productId);
+      }
     } catch (e) {
-      throw Exception('Failed to remove favorite: $e');
+      print('❌ Error removing favorite from Supabase: $e');
     }
   }
 
   /// Check if a product is favorited by current user
   static Future<bool> isFavorite(String productId) async {
-    try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return false;
-
-      final response = await Supabase.instance.client
-          .from('favorites')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('product_id', productId)
-          .maybeSingle();
-
-      return response != null;
-    } catch (e) {
-      return false;
-    }
+    final favs = await getFavoriteProductIds();
+    return favs.contains(productId);
   }
 
   /// Get all favorited products for current user
   static Future<List<Map<String, dynamic>>> getFavorites() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
+      final favIds = await getFavoriteProductIds();
+      if (favIds.isEmpty) return [];
 
-      print('🔍 Fetching favorites for user: $userId');
-
-      // 1. Get the favorite rows first
-      final favRows = await Supabase.instance.client
-          .from('favorites')
-          .select('product_id')
-          .eq('user_id', userId);
-
-      if (favRows.isEmpty) {
-        print('ℹ️ No favorites found in database for this user.');
-        return [];
+      final allProducts = await getProducts();
+      final List<Map<String, dynamic>> result = [];
+      for (var p in allProducts) {
+        if (favIds.contains(p['id'].toString())) {
+          result.add({'product': p, 'product_id': p['id']});
+        }
       }
-
-      final productIds =
-          favRows
-              .map((f) => f['product_id']?.toString() ?? '')
-              .where((id) => id.isNotEmpty)
-              .toList();
-
-      print('🔍 Favorited product IDs: $productIds');
-
-      // 2. Now get the products for these IDs
-      final productsResponse = await Supabase.instance.client
-          .from('products')
-          .select('''
-            id, title, category, images, location, product_condition,
-            created_at, is_active, is_exchanged, price,
-            owner:user_profiles!owner_id(id, full_name, pseudo, avatar_url, location, payout_phone)
-          ''')
-          .filter('id', 'in', productIds);
-
-      final products = List<Map<String, dynamic>>.from(productsResponse);
-      print('✅ Found ${products.length} products details for favorites');
-
-      // 3. Map back to the format expected by FavoritesTabWidget
-      return products.map((p) {
-        return {'product': p, 'product_id': p['id']};
-      }).toList();
+      return result;
     } catch (e) {
       print('❌ Error in getFavorites: $e');
       return [];
@@ -1569,27 +1540,34 @@ class SupabaseService {
 
   /// Get set of favorited product IDs for current user (for quick lookup)
   static Future<Set<String>> getFavoriteProductIds() async {
+    final Set<String> ids = {};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localFavs = prefs.getStringList('wetio_favorites') ?? [];
+      ids.addAll(localFavs);
+    } catch (_) {}
+
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return {};
+      if (userId != null) {
+        final response = await Supabase.instance.client
+            .from('favorites')
+            .select('product_id')
+            .eq('user_id', userId);
 
-      print('🔍 Fetching favorite IDs for user: $userId');
-      final response = await Supabase.instance.client
-          .from('favorites')
-          .select('product_id')
-          .eq('user_id', userId);
-
-      final ids = (response as List)
-          .map((item) => item['product_id']?.toString() ?? '')
-          .where((id) => id.isNotEmpty)
-          .toSet();
-      
-      print('✅ Found ${ids.length} favorite IDs');
-      return ids;
+        for (var item in (response as List)) {
+          final pid = item['product_id']?.toString();
+          if (pid != null && pid.isNotEmpty) {
+            ids.add(pid);
+          }
+        }
+      }
     } catch (e) {
-      print('❌ Error fetching favorite IDs: $e');
-      return {};
+      print('❌ Error fetching favorite IDs from Supabase: $e');
     }
+
+    return ids;
   }
 
   /// Debug method to check if favorites table exists and has data

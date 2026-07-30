@@ -173,12 +173,18 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             children: [
               ListTile(
                 leading: CustomIconWidget(
-                  iconName: 'logout',
-                  color: AppTheme.warningOrange,
+                  iconName: SupabaseService.getCurrentUser() != null ? 'logout' : 'login',
+                  color: SupabaseService.getCurrentUser() != null ? AppTheme.warningOrange : AppTheme.primaryGreen,
                   size: 24.0,
                 ),
-                title: const Text('Se déconnecter'),
-                onTap: () => _showSignOutDialog(context),
+                title: Text(SupabaseService.getCurrentUser() != null ? 'Se déconnecter' : 'Se connecter / S\'inscrire'),
+                onTap: () {
+                  if (SupabaseService.getCurrentUser() != null) {
+                    _showSignOutDialog(context);
+                  } else {
+                    Navigator.pushNamed(context, AppRoutes.loginScreen);
+                  }
+                },
               ),
               const Divider(height: 1),
               ListTile(
