@@ -88,9 +88,9 @@ class TokenBenefitsSection extends StatelessWidget {
               ),
               SizedBox(height: 12),
               Text(
-                '• Vous commencez avec 50 jetons gratuits\n'
+                '• Vous commencez avec 30 jetons gratuits (3 publications)\n'
                 '• Chaque publication coûte 10 jetons\n'
-                '• Achetez 100 jetons pour 1000 FCFA\n'
+                '• Achetez 30 jetons pour 1000 FCFA\n'
                 '• Continuez à publier sans limite',
                 style: GoogleFonts.inter(
                   fontSize: 12,
