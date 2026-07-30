@@ -255,12 +255,16 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                             } catch (e) {
                               setDialogState(() => isSending = false);
                               if (ctx.mounted) {
+                                String msg = e.toString().replaceAll('Exception: ', '');
+                                if (msg.contains('NoSuchMethodError')) {
+                                  msg = 'Erreur lors de l\'envoi. Veuillez réessayer.';
+                                }
                                 ScaffoldMessenger.of(ctx).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                        'Erreur: Vérifiez votre numéro et réessayez.',
-                                        style:
-                                            GoogleFonts.inter(fontSize: 13)),
+                                      msg,
+                                      style: GoogleFonts.inter(fontSize: 13),
+                                    ),
                                     backgroundColor: colorScheme.error,
                                     behavior: SnackBarBehavior.floating,
                                   ),

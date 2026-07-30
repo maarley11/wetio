@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../routes/app_routes.dart';
 import 'auth_guard.dart';
 
+import '../services/app_language_service.dart';
+
 enum CustomBottomBarVariant { standard, floating, minimal }
 
 class CustomBottomBar extends StatefulWidget {
@@ -36,39 +38,42 @@ class _CustomBottomBarState extends State<CustomBottomBar>
   late AnimationController _animationController;
   late Animation<double> _animation;
 
-  final List<_BottomBarItem> _items = [
-    _BottomBarItem(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home,
-      label: 'Accueil',
-      route: AppRoutes.homeFeed,
-    ),
-    _BottomBarItem(
-      icon: Icons.chat_bubble_outline,
-      activeIcon: Icons.chat_bubble,
-      label: 'Chat',
-      route: AppRoutes.chatMessagesHub,
-    ),
-    _BottomBarItem(
-      icon: Icons.add_circle_outline,
-      activeIcon: Icons.add_circle,
-      label: 'Ajouter',
-      route: AppRoutes.addProduct,
-    ),
-    _BottomBarItem(
-      icon: Icons.local_shipping_outlined,
-      activeIcon: Icons.local_shipping,
-      label: 'Livreur',
-      route: AppRoutes.deliveryPartnerRegistrationSimplified,
-      isHighlighted: false,
-    ),
-    _BottomBarItem(
-      icon: Icons.person_outline,
-      activeIcon: Icons.person,
-      label: 'Profil',
-      route: AppRoutes.userProfile,
-    ),
-  ];
+  List<_BottomBarItem> _getItems() {
+    final lang = AppLanguageService.instance;
+    return [
+      _BottomBarItem(
+        icon: Icons.home_outlined,
+        activeIcon: Icons.home,
+        label: lang.translate('home'),
+        route: AppRoutes.homeFeed,
+      ),
+      _BottomBarItem(
+        icon: Icons.chat_bubble_outline,
+        activeIcon: Icons.chat_bubble,
+        label: lang.translate('chat'),
+        route: AppRoutes.chatMessagesHub,
+      ),
+      _BottomBarItem(
+        icon: Icons.add_circle_outline,
+        activeIcon: Icons.add_circle,
+        label: lang.translate('add'),
+        route: AppRoutes.addProduct,
+      ),
+      _BottomBarItem(
+        icon: Icons.local_shipping_outlined,
+        activeIcon: Icons.local_shipping,
+        label: lang.translate('courier'),
+        route: AppRoutes.deliveryPartnerRegistrationSimplified,
+        isHighlighted: false,
+      ),
+      _BottomBarItem(
+        icon: Icons.person_outline,
+        activeIcon: Icons.person,
+        label: lang.translate('profile'),
+        route: AppRoutes.userProfile,
+      ),
+    ];
+  }
 
   @override
   void initState() {
@@ -95,14 +100,19 @@ class _CustomBottomBarState extends State<CustomBottomBar>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    switch (widget.variant) {
-      case CustomBottomBarVariant.standard:
-        return _buildStandardBottomBar(context, theme, colorScheme);
-      case CustomBottomBarVariant.floating:
-        return _buildFloatingBottomBar(context, theme, colorScheme);
-      case CustomBottomBarVariant.minimal:
-        return _buildMinimalBottomBar(context, theme, colorScheme);
-    }
+    return AnimatedBuilder(
+      animation: AppLanguageService.instance,
+      builder: (context, _) {
+        switch (widget.variant) {
+          case CustomBottomBarVariant.standard:
+            return _buildStandardBottomBar(context, theme, colorScheme);
+          case CustomBottomBarVariant.floating:
+            return _buildFloatingBottomBar(context, theme, colorScheme);
+          case CustomBottomBarVariant.minimal:
+            return _buildMinimalBottomBar(context, theme, colorScheme);
+        }
+      },
+    );
   }
 
   Widget _buildStandardBottomBar(
@@ -127,7 +137,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: _items.asMap().entries.map((entry) {
+            children: _getItems().asMap().entries.map((entry) {
               final index = entry.key;
               final item = entry.value;
               final isSelected = index == widget.currentIndex;
@@ -204,7 +214,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: _items.asMap().entries.map((entry) {
+          children: _getItems().asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;
             final isSelected = index == widget.currentIndex;
@@ -280,7 +290,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
       child: SafeArea(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: _items.asMap().entries.map((entry) {
+          children: _getItems().asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;
             final isSelected = index == widget.currentIndex;

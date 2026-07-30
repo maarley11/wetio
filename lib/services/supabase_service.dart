@@ -547,6 +547,54 @@ class SupabaseService {
     } catch (e) {
       throw Exception('Sign-in failed: $e');
     }
+  /// Reset password by phone or email
+  static Future<void> resetPasswordByPhone(String identifier) async {
+    final clean = identifier.trim();
+    if (clean.isEmpty) throw Exception('Veuillez saisir un numéro de téléphone ou un email valide.');
+
+    final supabase = Supabase.instance.client;
+
+    if (clean.contains('@')) {
+      await supabase.auth.resetPasswordForEmail(clean);
+      return;
+    }
+
+    final normalized = _normalizePhoneNumber(clean);
+    final rawClean = clean.replaceAll(RegExp(r'\D'), '');
+
+    try {
+      final userQuery = await supabase
+          .from('user_profiles')
+          .select('id, email, phone')
+          .or('phone.eq.$normalized,phone.eq.$rawClean,phone.eq.$clean')
+          .maybeSingle();
+
+      if (userQuery != null && userQuery['email'] != null) {
+        final email = userQuery['email'] as String;
+        if (email.isNotEmpty) {
+          await supabase.auth.resetPasswordForEmail(email);
+          return;
+        }
+      }
+    } catch (e) {
+      print('Error searching user profile for password reset: $e');
+    }
+
+    String phoneE164 = rawClean;
+    if (!phoneE164.startsWith('+')) {
+      if (phoneE164.startsWith('221')) {
+        phoneE164 = '+$phoneE164';
+      } else {
+        phoneE164 = '+221$phoneE164';
+      }
+    }
+
+    try {
+      await supabase.auth.signInWithOtp(phone: phoneE164);
+    } catch (e) {
+      print('Error sending phone OTP: $e');
+      throw Exception('Impossible d\'envoyer le SMS à ce numéro. Vérifiez votre saisie.');
+    }
   }
 
   /// Custom sign in that works with email OR phone number
