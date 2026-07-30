@@ -634,10 +634,15 @@ class DeliveryRequestCardWidget extends StatelessWidget {
 
   Widget _buildClientInfo(
     BuildContext context,
-    Map<String, dynamic> client,
+    dynamic client,
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
+    final safeClient = (client is Map) ? client : {};
+    final avatar = (safeClient['avatar'] ?? '').toString();
+    final name = (safeClient['name'] ?? 'Utilisateur').toString();
+    final rating = (safeClient['rating'] ?? '4.8').toString();
+
     return Column(
       children: [
         Container(
@@ -651,14 +656,14 @@ class DeliveryRequestCardWidget extends StatelessWidget {
           ),
           child: ClipOval(
             child: CustomImageWidget(
-              imageUrl: (client['avatar'] ?? '').toString(),
+              imageUrl: avatar,
               fit: BoxFit.cover,
             ),
           ),
         ),
         SizedBox(height: 8.5),
         Text(
-          (client['name'] ?? 'Utilisateur').toString(),
+          name,
           style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w600,
             color: colorScheme.onSurface,
@@ -672,7 +677,7 @@ class DeliveryRequestCardWidget extends StatelessWidget {
           children: [
             CustomIconWidget(iconName: 'star', color: Colors.amber, size: 12.0),
             Text(
-              ' ${client['rating']}',
+              ' $rating',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 fontSize: 10,
@@ -745,11 +750,16 @@ class DeliveryRequestCardWidget extends StatelessWidget {
 
   Widget _buildDetailedClientCard(
     BuildContext context,
-    Map<String, dynamic> client,
+    dynamic client,
     String role,
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
+    final safeClient = (client is Map) ? client : {};
+    final avatar = (safeClient['avatar'] ?? '').toString();
+    final name = (safeClient['name'] ?? 'Utilisateur').toString();
+    final rating = (safeClient['rating'] ?? '4.8').toString();
+
     return Container(
       padding: EdgeInsets.all(12.0),
       decoration: BoxDecoration(
@@ -769,7 +779,7 @@ class DeliveryRequestCardWidget extends StatelessWidget {
             ),
             child: ClipOval(
               child: CustomImageWidget(
-                imageUrl: (client['avatar'] ?? '').toString(),
+                imageUrl: avatar,
                 fit: BoxFit.cover,
               ),
             ),
@@ -783,7 +793,7 @@ class DeliveryRequestCardWidget extends StatelessWidget {
             ),
           ),
           Text(
-            (client['name'] ?? 'Utilisateur').toString(),
+            name,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: colorScheme.onSurface,
@@ -800,7 +810,7 @@ class DeliveryRequestCardWidget extends StatelessWidget {
                 size: 14.0,
               ),
               Text(
-                ' ${client['rating']}',
+                ' $rating',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,

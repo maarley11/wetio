@@ -69,12 +69,19 @@ class _DeliveryPartnerNotificationSystemState
             "deliveryData": {
               "id": r['id'],
               "exchangeId": r['exchange_id'],
-              "pickup": r['pickup_address'],
-              "delivery": r['delivery_address'],
+              "pickup": r['pickup_address'] ?? 'Point A (Départ)',
+              "delivery": r['delivery_address'] ?? 'Point B (Arrivée)',
+              "estimatedDuration": "25 min",
+              "items": ["Colis d'échange"],
               "client1": {
-                "name": r['sender_profile']?['full_name'] ?? 'Client',
-                "avatar": r['sender_profile']?['avatar_url'],
+                "name": r['sender_profile']?['full_name'] ?? 'Expéditeur',
+                "avatar": r['sender_profile']?['avatar_url'] ?? '',
                 "rating": 4.8,
+              },
+              "client2": {
+                "name": r['receiver_profile']?['full_name'] ?? 'Destinataire',
+                "avatar": r['receiver_profile']?['avatar_url'] ?? '',
+                "rating": 4.9,
               },
             },
           }).toList();
@@ -703,26 +710,26 @@ class _DeliveryPartnerNotificationSystemState
   }
 
   void _viewDeliveryRequest(Map<String, dynamic> notification) {
-    // Safe access to nested data
-    final deliveryData = notification['deliveryData'] ?? notification['data'] ?? {};
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: 80.h,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(20),
+      builder: (context) => Material(
+        color: Colors.transparent,
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(20),
+            ),
           ),
-        ),
-        child: DeliveryRequestCardWidget(
-          request: notification,
-          onAccept: () => _acceptDeliveryRequest(notification),
-          onDecline: () => _declineDeliveryRequest(notification),
-          isDetailView: true,
+          child: DeliveryRequestCardWidget(
+            request: notification,
+            onAccept: () => _acceptDeliveryRequest(notification),
+            onDecline: () => _declineDeliveryRequest(notification),
+            isDetailView: true,
+          ),
         ),
       ),
     );
