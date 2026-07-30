@@ -279,13 +279,40 @@ class SupabaseService {
       final user = getCurrentUser();
       if (user == null) return [];
 
-      final response = await Supabase.instance.client
-          .from('delivery_requests')
-          .select('*')
-          .eq('partner_user_id', user.id)
-          .order('created_at', ascending: false);
+      List<Map<String, dynamic>> list = [];
+      try {
+        final response = await Supabase.instance.client
+            .from('delivery_requests')
+            .select('*, sender_profile:user_profiles!person_a_id(full_name, avatar_url), receiver_profile:user_profiles!person_b_id(full_name, avatar_url)')
+            .eq('partner_user_id', user.id)
+            .order('created_at', ascending: false);
+        list = List<Map<String, dynamic>>.from(response);
+      } catch (_) {
+        final response = await Supabase.instance.client
+            .from('delivery_requests')
+            .select('*')
+            .eq('partner_user_id', user.id)
+            .order('created_at', ascending: false);
+        list = List<Map<String, dynamic>>.from(response);
+      }
 
-      return List<Map<String, dynamic>>.from(response);
+      // Enrich profiles manually if missing
+      for (var req in list) {
+        if (req['sender_profile'] == null && req['person_a_id'] != null) {
+          final profileA = await getUserProfile(req['person_a_id'].toString());
+          if (profileA != null) {
+            req['sender_profile'] = profileA;
+          }
+        }
+        if (req['receiver_profile'] == null && req['person_b_id'] != null) {
+          final profileB = await getUserProfile(req['person_b_id'].toString());
+          if (profileB != null) {
+            req['receiver_profile'] = profileB;
+          }
+        }
+      }
+
+      return list;
     } catch (e) {
       print('Error fetching my delivery requests: $e');
       return [];

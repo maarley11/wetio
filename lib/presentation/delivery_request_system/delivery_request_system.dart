@@ -50,8 +50,15 @@ class _DeliveryRequestSystemState extends State<DeliveryRequestSystem> {
     }
   }
 
+  final TextEditingController _pickupAddressController =
+      TextEditingController(text: 'Gueule Tapée, Dakar');
+  final TextEditingController _deliveryAddressController =
+      TextEditingController(text: 'Médina, Dakar');
+
   @override
   void dispose() {
+    _pickupAddressController.dispose();
+    _deliveryAddressController.dispose();
     _deliverySubscription?.unsubscribe();
     super.dispose();
   }
@@ -117,17 +124,24 @@ class _DeliveryRequestSystemState extends State<DeliveryRequestSystem> {
     HapticFeedback.mediumImpact();
     setState(() => _isLoading = true);
 
+    final pickupAddr = _pickupAddressController.text.trim().isEmpty
+        ? 'Gueule Tapée, Dakar'
+        : _pickupAddressController.text.trim();
+    final deliveryAddr = _deliveryAddressController.text.trim().isEmpty
+        ? 'Médina, Dakar'
+        : _deliveryAddressController.text.trim();
+
     try {
       final requestId = await SupabaseService.createDeliveryRequest(
         partnerUserId: partner['id'],
         exchangeId: _exchangeId!,
         personA: {
-          'address': 'Point A (Départ)',
+          'address': pickupAddr,
           'lat': 14.6937,
           'lng': -17.4441,
         },
         personB: {
-          'address': 'Point B (Arrivée)',
+          'address': deliveryAddr,
           'lat': 14.7167,
           'lng': -17.4677,
         },
@@ -608,12 +622,13 @@ class _DeliveryRequestSystemState extends State<DeliveryRequestSystem> {
             ],
           ),
           SizedBox(height: 17.0),
-          _buildAddressRow(
+          _buildEditableAddressRow(
             colorScheme,
             Icons.circle,
             const Color(0xFF22C55E),
-            'Point A (Départ)',
-            'Votre adresse actuelle',
+            'Point A (Départ - Expéditeur)',
+            _pickupAddressController,
+            'Ex: Gueule Tapée, Rue 6',
           ),
           Padding(
             padding: EdgeInsets.only(left: 16.0),
@@ -629,12 +644,13 @@ class _DeliveryRequestSystemState extends State<DeliveryRequestSystem> {
               ),
             ),
           ),
-          _buildAddressRow(
+          _buildEditableAddressRow(
             colorScheme,
             Icons.location_on,
             colorScheme.primary,
-            'Point B (Destination)',
-            'Adresse de livraison',
+            'Point B (Destination - Destinataire)',
+            _deliveryAddressController,
+            'Ex: Médina, Rue 22',
           ),
           SizedBox(height: 12.8),
           Row(
@@ -666,17 +682,19 @@ class _DeliveryRequestSystemState extends State<DeliveryRequestSystem> {
     );
   }
 
-  Widget _buildAddressRow(
+  Widget _buildEditableAddressRow(
     ColorScheme colorScheme,
     IconData icon,
     Color iconColor,
     String label,
-    String address,
+    TextEditingController controller,
+    String hintText,
   ) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(icon, color: iconColor, size: 16.0),
-        SizedBox(width: 8.0),
+        Icon(icon, color: iconColor, size: 18.0),
+        SizedBox(width: 12.0),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,16 +702,33 @@ class _DeliveryRequestSystemState extends State<DeliveryRequestSystem> {
               Text(
                 label,
                 style: GoogleFonts.dmSans(
-                  fontSize: 10,
+                  fontSize: 11,
                   color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              Text(
-                address,
+              SizedBox(height: 4),
+              TextField(
+                controller: controller,
                 style: GoogleFonts.dmSans(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: colorScheme.onSurface,
+                ),
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colorScheme.primary),
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surface,
                 ),
               ),
             ],

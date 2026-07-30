@@ -74,13 +74,13 @@ class _DeliveryPartnerNotificationSystemState
               "estimatedDuration": r['estimated_duration'] ?? "25 min",
               "items": r['items'] ?? ["Colis d'échange (Robe & Accessoires)"],
               "client1": {
-                "name": r['sender_name'] ?? r['sender_profile']?['full_name'] ?? 'Moussa Diallo',
-                "avatar": r['sender_avatar'] ?? r['sender_profile']?['avatar_url'] ?? '',
+                "name": r['sender_profile']?['full_name'] ?? r['sender_name'] ?? 'Expéditeur',
+                "avatar": r['sender_profile']?['avatar_url'] ?? r['sender_avatar'] ?? '',
                 "rating": r['sender_rating'] ?? 4.8,
               },
               "client2": {
-                "name": r['receiver_name'] ?? r['receiver_profile']?['full_name'] ?? 'Awa Ndiaye',
-                "avatar": r['receiver_avatar'] ?? r['receiver_profile']?['avatar_url'] ?? '',
+                "name": r['receiver_profile']?['full_name'] ?? r['receiver_name'] ?? 'Destinataire',
+                "avatar": r['receiver_profile']?['avatar_url'] ?? r['receiver_avatar'] ?? '',
                 "rating": r['receiver_rating'] ?? 4.9,
               },
             },
