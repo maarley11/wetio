@@ -526,7 +526,7 @@ class DeliveryRequestCardWidget extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  (deliveryData['pickup'] ?? 'Point de départ').toString(),
+                                  (deliveryData['pickup'] ?? 'Dakar Plateau, Sénégal').toString(),
                                   style: theme.textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: colorScheme.onSurface,
@@ -541,7 +541,7 @@ class DeliveryRequestCardWidget extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  (deliveryData['delivery'] ?? 'Point d\'arrivée').toString(),
+                                  (deliveryData['delivery'] ?? 'Almadies, Zone B (Dakar)').toString(),
                                   style: theme.textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: colorScheme.onSurface,
