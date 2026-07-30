@@ -547,6 +547,8 @@ class SupabaseService {
     } catch (e) {
       throw Exception('Sign-in failed: $e');
     }
+  }
+
   /// Reset password by phone or email
   static Future<void> resetPasswordByPhone(String identifier) async {
     final clean = identifier.trim();
