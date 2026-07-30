@@ -45,113 +45,8 @@ class _DeliveryPartnerEarningsDashboardState
     'avgRating': 4.8,
   };
 
-  final List<Map<String, dynamic>> _deliveries = [
-    {
-      'id': 'DEL-2024-001',
-      'date': '2024-01-15',
-      'time': '14:30',
-      'client': 'Aminata Diallo',
-      'from': 'Plateau, Dakar',
-      'to': 'Almadies, Dakar',
-      'distance': '8.2 km',
-      'baseAmount': 2500,
-      'commission': 425,
-      'commissionRate': 17,
-      'tip': 200,
-      'netEarning': 2275,
-      'status': 'completed',
-    },
-    {
-      'id': 'DEL-2024-002',
-      'date': '2024-01-15',
-      'time': '16:45',
-      'client': 'Moussa Ndiaye',
-      'from': 'Médina, Dakar',
-      'to': 'Grand Yoff, Dakar',
-      'distance': '5.1 km',
-      'baseAmount': 1800,
-      'commission': 270,
-      'commissionRate': 15,
-      'tip': 0,
-      'netEarning': 1530,
-      'status': 'completed',
-    },
-    {
-      'id': 'DEL-2024-003',
-      'date': '2024-01-14',
-      'time': '10:15',
-      'client': 'Fatou Seck',
-      'from': 'Point E, Dakar',
-      'to': 'Parcelles Assainies, Dakar',
-      'distance': '12.4 km',
-      'baseAmount': 3500,
-      'commission': 525,
-      'commissionRate': 15,
-      'tip': 500,
-      'netEarning': 3475,
-      'status': 'completed',
-    },
-    {
-      'id': 'DEL-2024-004',
-      'date': '2024-01-14',
-      'time': '13:20',
-      'client': 'Ousmane Ba',
-      'from': 'Sacré-Cœur, Dakar',
-      'to': 'Yoff, Dakar',
-      'distance': '9.7 km',
-      'baseAmount': 2800,
-      'commission': 504,
-      'commissionRate': 18,
-      'tip': 300,
-      'netEarning': 2596,
-      'status': 'completed',
-    },
-    {
-      'id': 'DEL-2024-005',
-      'date': '2024-01-13',
-      'time': '09:00',
-      'client': 'Khady Diop',
-      'from': 'Liberté 6, Dakar',
-      'to': 'Mermoz, Dakar',
-      'distance': '3.8 km',
-      'baseAmount': 1500,
-      'commission': 300,
-      'commissionRate': 20,
-      'tip': 100,
-      'netEarning': 1300,
-      'status': 'completed',
-    },
-  ];
-
-  final List<Map<String, dynamic>> _paymentHistory = [
-    {
-      'id': 'PAY-2024-W02',
-      'date': '2024-01-14',
-      'amount': 52300,
-      'deliveries': 28,
-      'status': 'completed',
-      'bankRef': 'BNK-7823-XY',
-      'method': 'Virement bancaire',
-    },
-    {
-      'id': 'PAY-2024-W01',
-      'date': '2024-01-07',
-      'amount': 44800,
-      'deliveries': 22,
-      'status': 'completed',
-      'bankRef': 'BNK-7654-AB',
-      'method': 'Virement bancaire',
-    },
-    {
-      'id': 'PAY-2023-W52',
-      'date': '2023-12-31',
-      'amount': 61200,
-      'deliveries': 35,
-      'status': 'completed',
-      'bankRef': 'BNK-7421-CD',
-      'method': 'Virement bancaire',
-    },
-  ];
+  List<Map<String, dynamic>> _deliveries = [];
+  List<Map<String, dynamic>> _paymentHistory = [];
 
   @override
   void initState() {
@@ -164,11 +59,43 @@ class _DeliveryPartnerEarningsDashboardState
     setState(() => _isLoading = true);
     try {
       final balance = await SupabaseService.getCourierBalance();
+      final myRequests = await SupabaseService.getMyDeliveryRequests();
+      
+      final realDeliveries = <Map<String, dynamic>>[];
+      for (var r in myRequests) {
+        final gross = (r['delivery_fee'] ?? 2000) as int;
+        final commission = (gross * 0.17).round();
+        final net = gross - commission;
+        final clientName = r['sender_profile']?['full_name'] ?? r['sender_name'] ?? 'Client Wetio';
+        final pickup = r['pickup_address'] ?? 'Dakar';
+        final delivery = r['delivery_address'] ?? 'Dakar';
+        
+        realDeliveries.add({
+          'id': r['id'] ?? 'DEL-${DateTime.now().millisecondsSinceEpoch}',
+          'date': (r['created_at'] != null) ? r['created_at'].toString().split('T').first : 'Aujourd\'hui',
+          'time': (r['created_at'] != null && r['created_at'].toString().contains('T'))
+              ? r['created_at'].toString().split('T').last.substring(0, 5)
+              : '12:00',
+          'client': clientName,
+          'from': pickup,
+          'to': delivery,
+          'distance': '5.0 km',
+          'baseAmount': gross,
+          'commission': commission,
+          'commissionRate': 17,
+          'tip': 0,
+          'netEarning': net,
+          'status': r['delivery_status'] ?? 'completed',
+        });
+      }
+
       if (mounted) {
         setState(() {
           _currentBalance = balance;
+          _deliveries = realDeliveries;
           _weeklyData['currentWeekEarnings'] = balance.toInt();
           _weeklyData['netPayout'] = balance.toInt();
+          _weeklyData['completedDeliveries'] = realDeliveries.length;
           _isLoading = false;
         });
       }
