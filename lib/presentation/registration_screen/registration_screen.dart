@@ -536,7 +536,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  void _handleGoogleSignUp() async {
   void _showProviderPendingDialog(String providerName) {
     showDialog(
       context: context,
