@@ -858,6 +858,67 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
     );
   }
 
+  Future<void> _launchPaymentApp(String method, String rawPhone, int amount) async {
+    final cleanPhone = rawPhone.replaceAll(RegExp(r'\D'), '');
+    final fullPhone = cleanPhone.startsWith('221') ? cleanPhone : '221$cleanPhone';
+
+    // 1. Copy number to clipboard immediately
+    await Clipboard.setData(ClipboardData(text: cleanPhone));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Numéro $cleanPhone copié ! Ouverture de $method...'),
+          backgroundColor: AppTheme.primaryGreen,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    final isWave = method.toUpperCase().contains('WAVE');
+    final isOrange = method.toUpperCase().contains('ORANGE') || method.toUpperCase().contains('OM');
+
+    if (isWave) {
+      final waveWebUrl = Uri.parse('https://wave.com/send?phone=%2B$fullPhone');
+      final waveSchemeUrl = Uri.parse('wave://send?phone=%2B$fullPhone');
+
+      try {
+        if (await canLaunchUrl(waveSchemeUrl)) {
+          await launchUrl(waveSchemeUrl, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+
+      try {
+        if (await canLaunchUrl(waveWebUrl)) {
+          await launchUrl(waveWebUrl, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+
+      final waveFallback = Uri.parse('https://pay.wave.com');
+      if (await canLaunchUrl(waveFallback)) {
+        await launchUrl(waveFallback, mode: LaunchMode.externalApplication);
+      }
+    } else if (isOrange) {
+      final ussdCode = Uri.parse('tel:*144*1*1*$cleanPhone*${amount}%23');
+      final fallbackUssd = Uri.parse('tel:*144%23');
+
+      try {
+        if (await canLaunchUrl(ussdCode)) {
+          await launchUrl(ussdCode);
+          return;
+        }
+      } catch (_) {}
+
+      try {
+        if (await canLaunchUrl(fallbackUssd)) {
+          await launchUrl(fallbackUssd);
+        }
+      } catch (_) {}
+    }
+  }
+
   void _handlePaymentRedirect() {
     if (_sellerProfile == null) return;
 
@@ -865,6 +926,9 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
     final phone = _sellerProfile!['payout_phone']?.toString() ?? _sellerProfile!['phone']?.toString() ?? 'Inconnu';
     final amount = _total.toInt();
     final colorScheme = Theme.of(context).colorScheme;
+
+    // Automatically trigger app launch & clipboard copy
+    _launchPaymentApp(method, phone, amount);
 
     showDialog(
       context: context,
@@ -882,12 +946,29 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Veuillez envoyer le paiement via $method pour valider votre commande.',
-              style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[600]),
+              'Le numéro $phone a été copié automatiquement. Vous pouvez ouvrir l\'application $method pour valider le virement.',
+              style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[700]),
             ),
-            SizedBox(height: 25.5),
+            SizedBox(height: 17.0),
+            // Direct launch button inside modal
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  _launchPaymentApp(method, phone, amount);
+                },
+                icon: Icon(method.contains('WAVE') ? Icons.open_in_new : Icons.phone, size: 18, color: Colors.white),
+                label: Text('Ouvrir $method ($phone)', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: method.contains('WAVE') ? const Color(0xFF1DC4FF) : Colors.orange,
+                  padding: EdgeInsets.symmetric(vertical: 10.0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            SizedBox(height: 17.0),
             Container(
-              padding: EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(12.0),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(12),
@@ -897,7 +978,7 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
                 children: [
                   _paymentInfoRow('Montant', '$amount FCFA', isBold: true),
                   const Divider(),
-                  _paymentInfoRow('Destinataire', _sellerProfile!['full_name'] ?? 'Vendeur'),
+                  _paymentInfoRow('Destinataire', _sellerProfile!['full_name'] ?? _sellerProfile!['pseudo'] ?? 'Vendeur'),
                   const Divider(),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -923,7 +1004,7 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
                 ],
               ),
             ),
-            SizedBox(height: 25.5),
+            SizedBox(height: 17.0),
             Text(
               'Note : Une fois le transfert effectué, le vendeur recevra une notification et préparera votre colis.',
               style: GoogleFonts.inter(fontSize: 10, fontStyle: FontStyle.italic, color: AppTheme.primaryOrange),
