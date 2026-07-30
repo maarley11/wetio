@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_html/html.dart' as html;
 import '../stubs/io_stub.dart';
 
@@ -1524,12 +1525,18 @@ class SupabaseService {
       final favIds = await getFavoriteProductIds();
       if (favIds.isEmpty) return [];
 
-      final allProducts = await getProducts();
+      final productsResponse = await Supabase.instance.client
+          .from('products')
+          .select('''
+            id, title, category, images, location, product_condition,
+            created_at, is_active, is_exchanged, price,
+            owner:user_profiles!owner_id(id, full_name, pseudo, avatar_url, location, payout_phone)
+          ''')
+          .filter('id', 'in', favIds.toList());
+
       final List<Map<String, dynamic>> result = [];
-      for (var p in allProducts) {
-        if (favIds.contains(p['id'].toString())) {
-          result.add({'product': p, 'product_id': p['id']});
-        }
+      for (var p in (productsResponse as List)) {
+        result.add({'product': p, 'product_id': p['id']});
       }
       return result;
     } catch (e) {
