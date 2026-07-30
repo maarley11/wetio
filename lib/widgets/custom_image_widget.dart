@@ -28,10 +28,7 @@ class CustomImageWidget extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
-      maxWidthDiskCache: 600,
-      maxHeightDiskCache: 600,
-      memCacheWidth: 400,
-      memCacheHeight: 400,
+      alignment: Alignment.center,
 
       // Use caller-supplied widget if provided, else fallback asset.
       errorWidget: (context, url, error) =>

@@ -61,6 +61,8 @@ class UserProfileHeader extends StatelessWidget {
                           userData['avatar'].toString().isNotEmpty
                       ? CustomImageWidget(
                           imageUrl: userData['avatar'],
+                          width: 120.0,
+                          height: 120.0,
                           fit: BoxFit.cover,
                         )
                       : Container(

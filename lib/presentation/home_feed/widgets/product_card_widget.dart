@@ -222,16 +222,19 @@ class _ProductCardWidgetState extends State<ProductCardWidget> {
                 children: [
                   // Image
                   _hasValidImage(imageUrl)
-                      ? CustomImageWidget(
-                          imageUrl: imageUrl!,
-                          width: double.infinity,
-                          height: widget.isGridView ? 136.0 : 170.0,
-                          fit: BoxFit.cover,
-                          errorWidget: _getClothingPlaceholder(
-                            context,
-                            category,
-                            userGender,
-                            widget.isGridView,
+                      ? AspectRatio(
+                          aspectRatio: widget.isGridView ? 1.05 : 1.5,
+                          child: CustomImageWidget(
+                            imageUrl: imageUrl!,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            errorWidget: _getClothingPlaceholder(
+                              context,
+                              category,
+                              userGender,
+                              widget.isGridView,
+                            ),
                           ),
                         )
                       : _getClothingPlaceholder(

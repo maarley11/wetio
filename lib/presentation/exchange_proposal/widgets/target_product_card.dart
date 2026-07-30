@@ -37,16 +37,18 @@ class TargetProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Product Image
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: CustomImageWidget(
-              imageUrl: (targetProduct["images"] as List?)?.isNotEmpty == true 
-                  ? targetProduct["images"][0] 
-                  : (targetProduct["image"] as String? ?? ""),
-              width: double.infinity,
-              height: 255.0,
-              fit: BoxFit.cover,
+            child: AspectRatio(
+              aspectRatio: 1.25,
+              child: CustomImageWidget(
+                imageUrl: (targetProduct["images"] as List?)?.isNotEmpty == true 
+                    ? targetProduct["images"][0] 
+                    : (targetProduct["image"] as String? ?? ""),
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
 
