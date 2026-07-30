@@ -144,7 +144,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
       if (productId.isEmpty) return;
       try {
         if (isFav) {
-          await SupabaseService.addFavorite(productId);
+          await SupabaseService.addFavorite(productId, productData: product);
           setState(() => _favoriteProductIds.add(productId));
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

@@ -1467,7 +1467,7 @@ class SupabaseService {
   // ========== FAVORITES (LI LA BEUGUE) METHODS ==========
 
   /// Add a product to favorites
-  static Future<void> addFavorite(String productId) async {
+  static Future<void> addFavorite(String productId, {Map<String, dynamic>? productData}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final localFavs = prefs.getStringList('wetio_favorites') ?? [];
@@ -1475,12 +1475,19 @@ class SupabaseService {
         localFavs.add(productId);
         await prefs.setStringList('wetio_favorites', localFavs);
       }
-    } catch (_) {}
+
+      if (productData != null) {
+        final jsonStr = jsonEncode(productData);
+        await prefs.setString('wetio_fav_map_$productId', jsonStr);
+      }
+    } catch (e) {
+      print('Error caching favorite locally: $e');
+    }
 
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId != null) {
-        await Supabase.instance.client.from('favorites').insert({
+        await Supabase.instance.client.from('favorites').upsert({
           'user_id': userId,
           'product_id': productId,
         });
@@ -1497,6 +1504,7 @@ class SupabaseService {
       final localFavs = prefs.getStringList('wetio_favorites') ?? [];
       localFavs.remove(productId);
       await prefs.setStringList('wetio_favorites', localFavs);
+      await prefs.remove('wetio_fav_map_$productId');
     } catch (_) {}
 
     try {
@@ -1525,19 +1533,43 @@ class SupabaseService {
       final favIds = await getFavoriteProductIds();
       if (favIds.isEmpty) return [];
 
-      final productsResponse = await Supabase.instance.client
-          .from('products')
-          .select('''
-            id, title, category, images, location, product_condition,
-            created_at, is_active, is_exchanged, price,
-            owner:user_profiles!owner_id(id, full_name, pseudo, avatar_url, location, payout_phone)
-          ''')
-          .filter('id', 'in', favIds.toList());
-
+      final prefs = await SharedPreferences.getInstance();
       final List<Map<String, dynamic>> result = [];
-      for (var p in (productsResponse as List)) {
-        result.add({'product': p, 'product_id': p['id']});
+      final List<String> missingFromCache = [];
+
+      for (var pid in favIds) {
+        final cachedJson = prefs.getString('wetio_fav_map_$pid');
+        if (cachedJson != null && cachedJson.isNotEmpty) {
+          try {
+            final Map<String, dynamic> p = jsonDecode(cachedJson);
+            result.add({'product': p, 'product_id': pid});
+          } catch (_) {
+            missingFromCache.add(pid);
+          }
+        } else {
+          missingFromCache.add(pid);
+        }
       }
+
+      if (missingFromCache.isNotEmpty) {
+        try {
+          final inClause = '(${missingFromCache.map((id) => '"$id"').join(',')})';
+          final productsResponse = await Supabase.instance.client
+              .from('products')
+              .select('*, owner:user_profiles!owner_id(*)')
+              .filter('id', 'in', inClause);
+
+          for (var item in (productsResponse as List)) {
+            final Map<String, dynamic> pMap = Map<String, dynamic>.from(item as Map);
+            final pid = pMap['id'].toString();
+            await prefs.setString('wetio_fav_map_$pid', jsonEncode(pMap));
+            result.add({'product': pMap, 'product_id': pid});
+          }
+        } catch (e) {
+          print('Error fetching missing favorites from Supabase: $e');
+        }
+      }
+
       return result;
     } catch (e) {
       print('❌ Error in getFavorites: $e');
