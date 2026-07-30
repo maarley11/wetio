@@ -549,8 +549,8 @@ class SupabaseService {
     }
   }
 
-  /// Reset password by phone or email
-  static Future<void> resetPasswordByPhone(String identifier) async {
+  /// Reset password by phone or email - returns descriptive status string
+  static Future<String> resetPasswordByPhone(String identifier) async {
     final clean = identifier.trim();
     if (clean.isEmpty) throw Exception('Veuillez saisir un numéro de téléphone ou un email valide.');
 
@@ -558,7 +558,7 @@ class SupabaseService {
 
     if (clean.contains('@')) {
       await supabase.auth.resetPasswordForEmail(clean);
-      return;
+      return 'Un lien de réinitialisation a été envoyé à votre adresse email ($clean). Veuillez vérifier votre boîte de réception.';
     }
 
     final rawDigits = clean.replaceAll(RegExp(r'\D'), '');
@@ -574,7 +574,11 @@ class SupabaseService {
         final email = user['email'] as String?;
         if (email != null && email.isNotEmpty) {
           await supabase.auth.resetPasswordForEmail(email);
-          return;
+          final parts = email.split('@');
+          final masked = parts[0].length > 2 
+              ? '${parts[0].substring(0, 2)}***@${parts[1]}'
+              : '***@${parts[1]}';
+          return 'Un email de réinitialisation a été envoyé à l\'adresse ($masked) liée à votre numéro de téléphone.';
         }
       }
     } catch (e) {
@@ -592,10 +596,10 @@ class SupabaseService {
 
     try {
       await supabase.auth.signInWithOtp(phone: phoneE164);
+      return 'Un SMS de réinitialisation a été envoyé au numéro $phoneE164.';
     } catch (e) {
       print('SMS Provider notice: $e');
-      // Graceful success response so user isn't blocked
-      return;
+      return 'L\'envoi automatique de SMS par réseau mobile nécessite la clé d\'accès opérateur (Twilio / SMS Gateway) sur Supabase. Veuillez réinitialiser par Email ou contacter le support Kaywetio.';
     }
   }
 

@@ -122,6 +122,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
     final controller = TextEditingController();
     bool isSending = false;
     bool sent = false;
+    String sentMessage = 'Un SMS de récupération a été envoyé à votre numéro.';
 
     showDialog(
       context: context,
@@ -153,7 +154,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                         color: AppTheme.successGreen, size: 48),
                     SizedBox(height: 17.0),
                     Text(
-                      'Un SMS de récupération a été envoyé à votre numéro.',
+                      sentMessage,
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: colorScheme.onSurfaceVariant,
@@ -247,10 +248,11 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                             if (value.isEmpty) return;
                             setDialogState(() => isSending = true);
                             try {
-                              await SupabaseService.resetPasswordByPhone(value);
+                              final msg = await SupabaseService.resetPasswordByPhone(value);
                               setDialogState(() {
                                 isSending = false;
                                 sent = true;
+                                sentMessage = msg;
                               });
                             } catch (e) {
                               setDialogState(() => isSending = false);
