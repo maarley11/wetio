@@ -1223,14 +1223,7 @@ class SupabaseService {
     }
   }
 
-  /// Reset password by phone - send OTP
-  static Future<void> resetPasswordByPhone(String phone) async {
-    try {
-      await Supabase.instance.client.auth.signInWithOtp(phone: phone);
-    } catch (e) {
-      throw Exception('Phone OTP failed: $e');
-    }
-  }
+
 
   // ========== EXISTING METHODS ==========
 
