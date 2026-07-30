@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../services/app_language_service.dart';
 import '../../services/supabase_service.dart';
 import './widgets/login_form_widget.dart';
 import './widgets/social_login_widget.dart';
@@ -428,29 +429,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
-                    SizedBox(height: 34.0),
-
                     // Welcome Text
-                    Text(
-                      'Bon retour!',
-                      style: GoogleFonts.inter(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    SizedBox(height: 8.5),
-
-                    Text(
-                      'Connectez-vous avec votre email ou téléphone',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
+                    AnimatedBuilder(
+                      animation: AppLanguageService.instance,
+                      builder: (context, _) {
+                        final lang = AppLanguageService.instance;
+                        return Column(
+                          children: [
+                            Text(
+                              lang.translate('login_welcome'),
+                              style: GoogleFonts.inter(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 8.5),
+                            Text(
+                              lang.translate('login_subtitle'),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        );
+                      },
                     ),
 
                     SizedBox(height: 34.0),
