@@ -4,6 +4,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../services/app_language_service.dart';
 import '../../widgets/custom_app_bar.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
@@ -39,8 +40,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
   Future<void> _saveLanguagePreference(String languageCode) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('app_language', languageCode);
+      await AppLanguageService.instance.changeLanguage(languageCode);
       setState(() {
         _selectedLanguage = languageCode;
       });
@@ -61,61 +61,68 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: CustomAppBar(title: 'Paramètres du compte', centerTitle: true),
-      body: ListView(
-        padding: EdgeInsets.all(16.0),
-        children: [
-          _buildSettingOption(
-            context,
-            'Modifier le profil',
-            'person',
-            () async {
-              // Navigate and wait for result
-              final result = await Navigator.pushNamed(
-                context,
-                '/edit-profile-screen',
-              );
+    final lang = AppLanguageService.instance;
 
-              // If profile was updated, return success to UserProfileScreen
-              if (result == true && context.mounted) {
-                Navigator.pop(context, true);
-              }
-            },
-            colorScheme,
+    return AnimatedBuilder(
+      animation: lang,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: CustomAppBar(
+            title: lang.translate('account_settings'),
+            centerTitle: true,
           ),
-          _buildSettingOption(
-            context,
-            'Notifications',
-            'notifications',
-            () => Navigator.pushNamed(context, '/notification-settings-screen'),
-            colorScheme,
+          body: ListView(
+            padding: EdgeInsets.all(16.0),
+            children: [
+              _buildSettingOption(
+                context,
+                lang.translate('edit_profile'),
+                'person',
+                () async {
+                  final result = await Navigator.pushNamed(
+                    context,
+                    '/edit-profile-screen',
+                  );
+                  if (result == true && context.mounted) {
+                    Navigator.pop(context, true);
+                  }
+                },
+                colorScheme,
+              ),
+              _buildSettingOption(
+                context,
+                lang.translate('notifications'),
+                'notifications',
+                () => Navigator.pushNamed(context, '/notification-settings-screen'),
+                colorScheme,
+              ),
+              _buildSettingOption(
+                context,
+                lang.translate('privacy'),
+                'privacy_tip',
+                () => Navigator.pushNamed(context, '/privacy-settings-screen'),
+                colorScheme,
+              ),
+              _buildSettingOption(
+                context,
+                lang.translate('security'),
+                'security',
+                () => _showSecurityOptions(context),
+                colorScheme,
+              ),
+              _buildSettingOption(
+                context,
+                lang.translate('language'),
+                'language',
+                () => _showLanguageOptions(context),
+                colorScheme,
+              ),
+              SizedBox(height: 34.0),
+              _buildDangerZone(context, colorScheme),
+            ],
           ),
-          _buildSettingOption(
-            context,
-            'Confidentialité',
-            'privacy_tip',
-            () => Navigator.pushNamed(context, '/privacy-settings-screen'),
-            colorScheme,
-          ),
-          _buildSettingOption(
-            context,
-            'Sécurité',
-            'security',
-            () => _showSecurityOptions(context),
-            colorScheme,
-          ),
-          _buildSettingOption(
-            context,
-            'Langue',
-            'language',
-            () => _showLanguageOptions(context),
-            colorScheme,
-          ),
-          SizedBox(height: 34.0),
-          _buildDangerZone(context, colorScheme),
-        ],
-      ),
+        );
+      },
     );
   }
 
