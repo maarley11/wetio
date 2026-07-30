@@ -307,43 +307,59 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _showProviderPendingDialog(String providerName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: AppTheme.primaryGreen, size: 28),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Connexion $providerName',
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'L\'authentification par $providerName nécessite la configuration des identifiants OAuth ($providerName Cloud / Apple Developer) sur la console Supabase.\n\n'
+          'Veuillez utiliser votre numéro de téléphone ou votre adresse email pour vous connecter.',
+          style: GoogleFonts.inter(fontSize: 14),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Compris', style: GoogleFonts.inter(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _handleGoogleLogin() async {
-    setState(() => _isLoading = true);
     try {
       await SupabaseService.signInWithGoogle();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.homeFeed,
-          (route) => false,
-        );
-      }
     } catch (e) {
       if (mounted) {
-        _showErrorMessage('Connexion Google échouée. Réessayez.');
+        _showProviderPendingDialog('Google');
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _handleAppleLogin() async {
-    setState(() => _isLoading = true);
     try {
       await SupabaseService.signInWithApple();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRoutes.homeFeed,
-          (route) => false,
-        );
-      }
     } catch (e) {
       if (mounted) {
-        _showErrorMessage('Connexion Apple échouée. Réessayez.');
+        _showProviderPendingDialog('Apple');
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
