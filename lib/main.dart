@@ -4,12 +4,25 @@ import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 import 'package:sizer/sizer.dart';
 
+import 'package:onesignal_flutter/onesignal_flutter.dart';
+
 import '../core/app_export.dart';
 import './services/supabase_service.dart';
 import './widgets/custom_error_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize OneSignal Push Notifications
+  if (!kIsWeb) {
+    try {
+      OneSignal.Debug.setLogLevel(OSLogLevel.none);
+      OneSignal.initialize('413a0a67-f737-42ec-ab09-8a91dea50089');
+      OneSignal.Notifications.requestPermission(true);
+    } catch (e) {
+      debugPrint('Failed to initialize OneSignal: $e');
+    }
+  }
 
   // Initialize Stripe
   const stripePublishableKey = String.fromEnvironment(

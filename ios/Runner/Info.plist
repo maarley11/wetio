@@ -60,5 +60,10 @@
 	<string>Cette application utilise votre position pour rechercher des partenaires de livraison et des produits disponibles à proximité de chez vous, même en arrière-plan.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Cette application utilise votre position pour rechercher des partenaires de livraison et des produits disponibles à proximité de chez vous en arrière-plan.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
