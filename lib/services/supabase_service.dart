@@ -747,10 +747,12 @@ class SupabaseService {
   /// Sign in with Google OAuth
   static Future<void> signInWithGoogle() async {
     try {
-      final currentOrigin = kIsWeb ? html.window.location.origin : 'https://www.kaywetio.com';
+      final redirectTo = kIsWeb 
+          ? html.window.location.origin 
+          : 'com.wetio.app.testProject.V8A4F7BK95://login-callback';
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: '$currentOrigin/auth/callback',
+        redirectTo: redirectTo,
       );
     } catch (e) {
       throw Exception('Google sign-in failed: $e');
@@ -760,10 +762,12 @@ class SupabaseService {
   /// Sign in with Apple OAuth
   static Future<void> signInWithApple() async {
     try {
-      final currentOrigin = kIsWeb ? html.window.location.origin : 'https://www.kaywetio.com';
+      final redirectTo = kIsWeb 
+          ? html.window.location.origin 
+          : 'com.wetio.app.testProject.V8A4F7BK95://login-callback';
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.apple,
-        redirectTo: '$currentOrigin/auth/callback',
+        redirectTo: redirectTo,
       );
     } catch (e) {
       throw Exception('Apple sign-in failed: $e');
