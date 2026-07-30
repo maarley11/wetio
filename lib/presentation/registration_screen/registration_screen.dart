@@ -572,20 +572,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  void _handleGoogleSignUp() async {
-    try {
-      await SupabaseService.signInWithGoogle();
-    } catch (e) {
-      if (mounted) _showProviderPendingDialog('Google');
-    }
+  void _handleGoogleSignUp() {
+    _showProviderPendingDialog('Google');
   }
 
-  void _handleAppleSignUp() async {
-    try {
-      await SupabaseService.signInWithApple();
-    } catch (e) {
-      if (mounted) _showProviderPendingDialog('Apple');
-    }
+  void _handleAppleSignUp() {
+    _showProviderPendingDialog('Apple');
   }
 
   void _handleFacebookSignUp() {

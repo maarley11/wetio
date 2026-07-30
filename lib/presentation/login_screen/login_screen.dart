@@ -343,24 +343,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _handleGoogleLogin() async {
-    try {
-      await SupabaseService.signInWithGoogle();
-    } catch (e) {
-      if (mounted) {
-        _showProviderPendingDialog('Google');
-      }
-    }
+  void _handleGoogleLogin() {
+    _showProviderPendingDialog('Google');
   }
 
-  void _handleAppleLogin() async {
-    try {
-      await SupabaseService.signInWithApple();
-    } catch (e) {
-      if (mounted) {
-        _showProviderPendingDialog('Apple');
-      }
-    }
+  void _handleAppleLogin() {
+    _showProviderPendingDialog('Apple');
   }
 
   void _navigateToSignUp() {
