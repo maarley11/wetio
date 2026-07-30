@@ -614,7 +614,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               crossAxisCount: 2,
               crossAxisSpacing: 12.0,
               mainAxisSpacing: 12.0,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.58,
             ),
             itemCount: _availableProducts.length,
             itemBuilder: (context, index) {
