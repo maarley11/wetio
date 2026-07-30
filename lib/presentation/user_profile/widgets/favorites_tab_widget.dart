@@ -458,7 +458,7 @@ class _FavoritesTabWidgetState extends State<FavoritesTabWidget> {
                             HapticFeedback.lightImpact();
                             Navigator.pushNamed(
                               context,
-                              '/exchange-proposal',
+                              AppRoutes.exchangeProposal,
                               arguments: product,
                             );
                           },
