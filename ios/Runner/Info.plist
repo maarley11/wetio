@@ -48,6 +48,13 @@
         <key>NSAllowsArbitraryLoads</key>
         <true />
     </dict>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>wave</string>
+		<string>whatsapp</string>
+		<string>tel</string>
+		<string>mailto</string>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cette application nécessite l'accès à votre galerie photo pour vous permettre de choisir une photo de profil et d'ajouter des images de produits.</string>
 	<key>NSCameraUsageDescription</key>

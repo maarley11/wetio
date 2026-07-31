@@ -862,37 +862,45 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
     final cleanPhone = rawPhone.replaceAll(RegExp(r'\D'), '');
     final fullPhone = cleanPhone.startsWith('221') ? cleanPhone : '221$cleanPhone';
 
+    // 1. Always copy seller number as auto safety net
+    await Clipboard.setData(ClipboardData(text: cleanPhone));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Numéro $cleanPhone copié. Ouverture de $method...'),
+          backgroundColor: AppTheme.primaryGreen,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
     final isWave = method.toUpperCase().contains('WAVE');
     final isOrange = method.toUpperCase().contains('ORANGE') || method.toUpperCase().contains('OM');
 
     if (isWave) {
-      // Wave direct pre-filled URL scheme (phone + amount pre-filled)
       final waveSchemeUrl = Uri.parse('wave://send?phone=%2B$fullPhone&amount=$amount');
-      final waveWebUrl = Uri.parse('https://wave.com/send?phone=%2B$fullPhone&amount=$amount');
-      final waveDirectUrl = Uri.parse('https://pay.wave.com/m/$fullPhone?amount=$amount');
+      final waveSimpleScheme = Uri.parse('wave://send?phone=$cleanPhone');
+      final waveAppUrl = Uri.parse('wave://');
 
       try {
-        if (await canLaunchUrl(waveSchemeUrl)) {
-          await launchUrl(waveSchemeUrl, mode: LaunchMode.externalApplication);
+        if (await launchUrl(waveSchemeUrl, mode: LaunchMode.externalNonBrowserApplication)) {
           return;
         }
       } catch (_) {}
 
       try {
-        if (await canLaunchUrl(waveWebUrl)) {
-          await launchUrl(waveWebUrl, mode: LaunchMode.externalApplication);
+        if (await launchUrl(waveSimpleScheme, mode: LaunchMode.externalApplication)) {
           return;
         }
       } catch (_) {}
 
       try {
-        if (await canLaunchUrl(waveDirectUrl)) {
-          await launchUrl(waveDirectUrl, mode: LaunchMode.externalApplication);
+        if (await launchUrl(waveAppUrl, mode: LaunchMode.externalApplication)) {
           return;
         }
       } catch (_) {}
     } else if (isOrange) {
-      // Orange Money Senegal USSD direct dial with number and amount pre-filled
       final ussdCode = Uri.parse('tel:*144*1*1*$cleanPhone*${amount}%23');
       final fallbackUssd = Uri.parse('tel:*144%23');
 
