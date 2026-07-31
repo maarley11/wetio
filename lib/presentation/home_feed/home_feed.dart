@@ -557,7 +557,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
         crossAxisCount: _getCrossAxisCount(context),
         crossAxisSpacing: 12.0,
         mainAxisSpacing: 17.0,
-        childAspectRatio: 0.635,
+        childAspectRatio: 0.61,
       ),
       itemCount: 6,
       itemBuilder: (context, index) => _buildSkeletonCard(),
@@ -659,7 +659,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
           crossAxisCount: _getCrossAxisCount(context),
           crossAxisSpacing: 12.0,
           mainAxisSpacing: 17.0,
-          childAspectRatio: 0.635,
+          childAspectRatio: 0.61,
         ),
         itemCount: _filteredProducts.length + (_isLoadingMore ? 2 : 0),
         itemBuilder: (context, index) {
