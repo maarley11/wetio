@@ -1216,7 +1216,6 @@ class SupabaseService {
       return [];
     }
   }
-  }
 
   /// Update user payout method (Wave, Orange Money, etc.)
   static Future<void> updatePayoutMethod({
