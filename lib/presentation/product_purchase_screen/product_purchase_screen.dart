@@ -50,8 +50,13 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
     if (args is Map<String, dynamic>) {
       _product = args;
       if (_isLoadingSeller) {
-        final sellerId = _product['owner_id']?.toString() ?? _product['ownerId']?.toString();
-        if (sellerId != null) {
+        final sellerId = _product['owner_id']?.toString() ?? 
+                         _product['ownerId']?.toString() ??
+                         _product['user_id']?.toString() ??
+                         _product['userId']?.toString() ??
+                         (_product['owner'] is Map ? _product['owner']['id']?.toString() : null) ??
+                         (_product['user'] is Map ? _product['user']['id']?.toString() : null);
+        if (sellerId != null && sellerId.isNotEmpty) {
           SupabaseService.getUserProfile(sellerId).then((profile) {
             if (mounted) {
               setState(() {
@@ -920,14 +925,48 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
     }
   }
 
-  void _handlePaymentRedirect() {
-    if (_sellerProfile == null) return;
+  String get _sellerPaymentPhone {
+    final profilePayout = _sellerProfile?['payout_phone']?.toString();
+    if (profilePayout != null && profilePayout.trim().isNotEmpty) {
+      return profilePayout.trim();
+    }
+    final profilePhone = _sellerProfile?['phone']?.toString();
+    if (profilePhone != null && profilePhone.trim().isNotEmpty) {
+      return profilePhone.trim();
+    }
+    final productPhone = _product['owner_phone']?.toString() ??
+                         _product['seller_phone']?.toString() ??
+                         _product['phone']?.toString() ??
+                         (_product['owner'] is Map ? _product['owner']['payout_phone']?.toString() ?? _product['owner']['phone']?.toString() : null);
+    if (productPhone != null && productPhone.trim().isNotEmpty) {
+      return productPhone.trim();
+    }
+    return '';
+  }
 
-    final method = _sellerProfile!['payout_method']?.toString().toUpperCase() ?? 'WAVE';
-    final phone = _sellerProfile!['payout_phone']?.toString() ?? _sellerProfile!['phone']?.toString() ?? 'Inconnu';
+  String get _sellerPaymentMethod {
+    final method = _sellerProfile?['payout_method']?.toString() ??
+                   (_product['owner'] is Map ? _product['owner']['payout_method']?.toString() : null) ??
+                   'WAVE';
+    return method.toUpperCase();
+  }
+
+  void _handlePaymentRedirect() {
+    final method = _sellerPaymentMethod;
+    final phone = _sellerPaymentPhone;
     final amount = _total.toInt();
 
-    // Directly open Wave or Orange Money with pre-filled phone number and amount!
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Numéro Wave/Orange Money du vendeur non configuré. Veuillez le contacter en direct.'),
+          backgroundColor: AppTheme.warningOrange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     _launchPaymentApp(method, phone, amount);
   }
 
@@ -946,6 +985,10 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
 
 
   Widget _buildOrderConfirmation(ColorScheme colorScheme) {
+    final sellerName = _sellerProfile?['full_name'] ?? _sellerProfile?['pseudo'] ?? _product['userName'] ?? 'le vendeur';
+    final targetPhone = _sellerPaymentPhone;
+    final targetMethod = _sellerPaymentMethod;
+
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
@@ -974,7 +1017,7 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
               ),
               SizedBox(height: 12.8),
               Text(
-                "Votre commande a été transmise au vendeur. Vous pouvez maintenant procéder au paiement via ${_sellerProfile?['payout_method'] ?? 'son service mobile money'}.",
+                "Votre commande a été transmise à $sellerName. Le paiement de ${_total.toInt()} FCFA sera versé directement sur son compte $targetMethod${targetPhone.isNotEmpty ? ' ($targetPhone)' : ''}.",
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   color: colorScheme.onSurface.withValues(alpha: 0.7),
@@ -983,25 +1026,23 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
               ),
               SizedBox(height: 34.0),
               
-              if (_sellerProfile != null) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _handlePaymentRedirect,
-                    icon: const Icon(Icons.account_balance_wallet_outlined, color: Colors.white),
-                    label: Text(
-                      "Payer ${_total.toInt()} FCFA via ${_sellerProfile?['payout_method'] ?? 'Mobile Money'}",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
-                      padding: EdgeInsets.symmetric(vertical: 17.0),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _handlePaymentRedirect,
+                  icon: const Icon(Icons.account_balance_wallet_outlined, color: Colors.white),
+                  label: Text(
+                    "Payer ${_total.toInt()} FCFA via $targetMethod${targetPhone.isNotEmpty ? ' ($targetPhone)' : ''}",
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    padding: EdgeInsets.symmetric(vertical: 17.0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
-                SizedBox(height: 17.0),
-              ],
+              ),
+              SizedBox(height: 17.0),
               
               SizedBox(
                 width: double.infinity,
