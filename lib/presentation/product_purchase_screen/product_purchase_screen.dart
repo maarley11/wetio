@@ -992,64 +992,189 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.0),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              SizedBox(height: 20.0),
               Container(
-                width: 100.0,
-                height: 100.0,
+                width: 90.0,
+                height: 90.0,
                 decoration: BoxDecoration(
                     color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                     shape: BoxShape.circle),
                 child: Icon(Icons.check_circle_outline,
-                    color: AppTheme.primaryGreen, size: 60.0),
+                    color: AppTheme.primaryGreen, size: 54.0),
               ),
-              SizedBox(height: 25.5),
+              SizedBox(height: 18.0),
               Text(
                 'Commande enregistrée !',
                 style: GoogleFonts.inter(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: colorScheme.onSurface),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 12.8),
+              SizedBox(height: 8.0),
               Text(
-                "Votre commande a été transmise à $sellerName. Le paiement de ${_total.toInt()} FCFA sera versé directement sur son compte $targetMethod${targetPhone.isNotEmpty ? ' ($targetPhone)' : ''}.",
+                "Votre commande a été transmise à $sellerName.",
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   color: colorScheme.onSurface.withValues(alpha: 0.7),
-                  height: 1.5,
+                  fontSize: 13,
+                  height: 1.4,
                 ),
               ),
-              SizedBox(height: 34.0),
+              SizedBox(height: 24.0),
+
+              // Senior Developer Payment Guidance Card
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                    width: 1.2,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.account_balance_wallet, color: AppTheme.primaryGreen, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          "Paiement direct à $sellerName",
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.15)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Numéro $targetMethod du vendeur :",
+                                style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                targetPhone.isNotEmpty ? targetPhone : 'Non renseigné',
+                                style: GoogleFonts.inter(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.primaryGreen,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (targetPhone.isNotEmpty)
+                            InkWell(
+                              onTap: () async {
+                                final cleanPhone = targetPhone.replaceAll(RegExp(r'\D'), '');
+                                await Clipboard.setData(ClipboardData(text: cleanPhone));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('📋 Numéro $cleanPhone copié dans le presse-papier !'),
+                                      backgroundColor: AppTheme.primaryGreen,
+                                      duration: const Duration(seconds: 3),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.copy, size: 14, color: AppTheme.primaryGreen),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "Copier",
+                                      style: TextStyle(
+                                        color: AppTheme.primaryGreen,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: AppTheme.primaryOrange),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            "Le numéro $targetPhone est automatiquement copié. Dans $targetMethod, collez-le et envoyez ${_total.toInt()} FCFA.",
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: colorScheme.onSurface.withValues(alpha: 0.8),
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 24.0),
               
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _handlePaymentRedirect,
-                  icon: const Icon(Icons.account_balance_wallet_outlined, color: Colors.white),
+                  icon: const Icon(Icons.launch, color: Colors.white, size: 20),
                   label: Text(
-                    "Payer ${_total.toInt()} FCFA via $targetMethod${targetPhone.isNotEmpty ? ' ($targetPhone)' : ''}",
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    "Ouvrir l'application $targetMethod",
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryGreen,
-                    padding: EdgeInsets.symmetric(vertical: 17.0),
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
-              SizedBox(height: 17.0),
+              SizedBox(height: 14.0),
               
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => Navigator.pushNamedAndRemoveUntil(context, AppRoutes.homeFeed, (route) => false),
                   style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 17.0),
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
                     side: BorderSide(color: AppTheme.primaryGreen),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -1059,7 +1184,7 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
                   ),
                 ),
               ),
-              SizedBox(height: 17.0),
+              SizedBox(height: 12.0),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
@@ -1071,6 +1196,7 @@ class _ProductPurchaseScreenState extends State<ProductPurchaseScreen> {
                   ),
                 ),
               ),
+              SizedBox(height: 20.0),
             ],
           ),
         ),
