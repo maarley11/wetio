@@ -36,7 +36,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
   bool _isLoading = false;
   bool _isLoadingMore = false;
   String _currentLocation = 'Dakar, Sénégal';
-  int _notificationCount = 3;
+  int _notificationCount = 0;
   bool _isLoadingFromSupabase = false;
 
   Map<String, dynamic> _currentFilters = {
@@ -123,8 +123,19 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
       _isLoading = true;
     });
 
-    // Load from Supabase first, fallback to mock data
     _loadProductsFromSupabase();
+    _loadUnreadNotificationCount();
+  }
+
+  Future<void> _loadUnreadNotificationCount() async {
+    try {
+      final count = await SupabaseService.getUnreadNotificationCount();
+      if (mounted) {
+        setState(() {
+          _notificationCount = count;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadFavoriteIds() async {
@@ -496,9 +507,10 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
                 });
               }
             },
-            onNotificationTap: () {
+            onNotificationTap: () async {
               HapticFeedback.lightImpact();
-              _navigateWithAuthGuard(AppRoutes.notificationsScreen);
+              await Navigator.pushNamed(context, AppRoutes.notificationsScreen);
+              _loadUnreadNotificationCount();
             },
           ),
 

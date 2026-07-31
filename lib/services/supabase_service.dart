@@ -1012,69 +1012,98 @@ class SupabaseService {
     }
   }
 
-  /// Get all notifications for the current user (orders, exchanges, and deliveries)
+  /// Get real unread notification count for current user
+  static Future<int> getUnreadNotificationCount() async {
+    try {
+      final user = getCurrentUser();
+      if (user == null) return 0;
+
+      final notifications = await getNotifications();
+      return notifications.where((n) => n['isRead'] == false).length;
+    } catch (e) {
+      print('Error getting unread notification count: $e');
+      return 0;
+    }
+  }
+
+  /// Get all notifications for the current user (orders, exchanges, and deliveries) - Fast parallel fetch
   static Future<List<Map<String, dynamic>>> getNotifications() async {
     try {
       final user = getCurrentUser();
       if (user == null) return [];
 
-      // 1. Fetch received product orders (Sales)
-      final ordersResponse = await Supabase.instance.client
-          .from('product_orders')
-          .select('*')
-          .eq('seller_id', user.id)
-          .order('created_at', ascending: false);
+      // Run root queries in parallel for instant sub-second loading!
+      final results = await Future.wait([
+        // 0. Fetch product sales orders with joined product and buyer profile
+        Supabase.instance.client
+            .from('product_orders')
+            .select('*, products(title, images), user_profiles!buyer_id(full_name, phone)')
+            .eq('seller_id', user.id)
+            .order('created_at', ascending: false)
+            .catchError((_) => []),
 
-      // 2. Fetch received exchange proposals
-      final exchangesResponse = await Supabase.instance.client
-          .from('exchanges')
-          .select('*')
-          .eq('owner_id', user.id)
-          .eq('status', 'en_attente')
-          .order('created_at', ascending: false);
+        // 1. Fetch exchange proposals with joined target product and requester profile
+        Supabase.instance.client
+            .from('exchanges')
+            .select('*, products!target_product_id(title, images), user_profiles!requester_id(full_name)')
+            .eq('owner_id', user.id)
+            .eq('status', 'en_attente')
+            .order('created_at', ascending: false)
+            .catchError((_) => []),
+
+        // 2. Fetch delivery status updates
+        Supabase.instance.client
+            .from('delivery_requests')
+            .select('*')
+            .or('person_a_id.eq.${user.id},person_b_id.eq.${user.id}')
+            .neq('delivery_status', 'en_attente')
+            .order('updated_at', ascending: false)
+            .catchError((_) => []),
+
+        // 3. User profile check for delivery partner status
+        Supabase.instance.client
+            .from('user_profiles')
+            .select('is_delivery_partner')
+            .eq('id', user.id)
+            .maybeSingle()
+            .catchError((_) => null),
+      ]);
+
+      final ordersResponse = (results[0] as List?) ?? [];
+      final exchangesResponse = (results[1] as List?) ?? [];
+      final sentRequestsResponse = (results[2] as List?) ?? [];
+      final profile = results[3] as Map<String, dynamic>?;
 
       List<Map<String, dynamic>> allNotifications = [];
 
-      // 3. If user is a delivery partner, also get pending delivery requests
-      final profile = await Supabase.instance.client
-          .from('user_profiles')
-          .select('is_delivery_partner')
-          .eq('id', user.id)
-          .maybeSingle();
-      
+      // Delivery partner pending requests
       if (profile != null && profile['is_delivery_partner'] == true) {
-        final deliveryRequests = await getMyDeliveryRequests();
-        for (var req in deliveryRequests) {
-          if (req['delivery_status'] == 'en_attente') {
-            allNotifications.add({
-              'id': 'delivery_${req['id']}',
-              'type': 'delivery_request',
-              'category': 'Livraisons',
-              'title': 'NOUVELLE LIVRAISON DISPONIBLE',
-              'message': 'Une nouvelle demande de livraison attend votre acceptation.',
-              'timestamp': req['created_at'],
-              'isRead': false,
-              'accentColor': const Color(0xFF2196F3), // Blue
-              'data': req,
-            });
+        try {
+          final deliveryRequests = await getMyDeliveryRequests();
+          for (var req in deliveryRequests) {
+            if (req['delivery_status'] == 'en_attente') {
+              allNotifications.add({
+                'id': 'delivery_${req['id']}',
+                'type': 'delivery_request',
+                'category': 'Livraisons',
+                'title': 'NOUVELLE LIVRAISON DISPONIBLE',
+                'message': 'Une nouvelle demande de livraison attend votre acceptation.',
+                'timestamp': req['created_at'],
+                'isRead': false,
+                'accentColor': const Color(0xFF2196F3),
+                'data': req,
+              });
+            }
           }
-        }
+        } catch (_) {}
       }
 
-      // 4. Fetch status updates for delivery requests where user is either person A or person B
-      final sentRequestsResponse = await Supabase.instance.client
-          .from('delivery_requests')
-          .select('*')
-          .or('person_a_id.eq.${user.id},person_b_id.eq.${user.id}')
-          .neq('delivery_status', 'en_attente')
-          .order('updated_at', ascending: false);
-
+      // Delivery status updates
       for (var req in sentRequestsResponse) {
         final status = req['delivery_status'];
         final timestampStr = (req['updated_at'] ?? req['created_at']).toString();
         final baseTimestamp = DateTime.parse(timestampStr);
 
-        // Acceptation
         if (status == 'accepted' || status == 'recupere' || status == 'terminee') {
           allNotifications.add({
             'id': 'sent_delivery_acc_${req['id']}',
@@ -1089,7 +1118,6 @@ class SupabaseService {
           });
         }
 
-        // Récupération
         if (status == 'recupere' || status == 'terminee') {
           final pin = req['verification_pin'] ?? '----';
           allNotifications.add({
@@ -1105,7 +1133,6 @@ class SupabaseService {
           });
         }
 
-        // Livraison terminée
         if (status == 'terminee') {
           allNotifications.add({
             'id': 'sent_delivery_fin_${req['id']}',
@@ -1121,24 +1148,27 @@ class SupabaseService {
         }
       }
 
-      // Map orders to notification format
+      // Map orders (already joined!)
       for (var order in ordersResponse) {
         try {
-          final productRes = await Supabase.instance.client.from('products').select('title, images').eq('id', order['product_id']).maybeSingle();
-          final buyerRes = await Supabase.instance.client.from('user_profiles').select('full_name, phone').eq('id', order['buyer_id']).maybeSingle();
-          
-          final images = productRes?['images'] as List?;
+          final productData = order['products'] as Map<String, dynamic>?;
+          final buyerData = order['user_profiles'] as Map<String, dynamic>?;
+
+          final title = productData?['title']?.toString() ?? 'produit';
+          final images = productData?['images'] as List?;
+          final buyerName = buyerData?['full_name']?.toString() ?? 'Un client';
+
           final Map<String, dynamic> extendedOrder = Map<String, dynamic>.from(order);
-          extendedOrder['buyer_name'] = buyerRes?['full_name'];
-          extendedOrder['buyer_phone'] = buyerRes?['phone'];
-          extendedOrder['product_title'] = productRes?['title'];
-          
+          extendedOrder['buyer_name'] = buyerName;
+          extendedOrder['buyer_phone'] = buyerData?['phone'];
+          extendedOrder['product_title'] = title;
+
           allNotifications.add({
             'id': 'order_${order['id']}',
             'type': 'order',
             'category': 'Ventes',
             'title': 'Nouvel achat !',
-            'message': '${buyerRes?['full_name'] ?? 'Un client'} a acheté votre ${productRes?['title'] ?? 'produit'}',
+            'message': '$buyerName a acheté votre $title',
             'timestamp': order['created_at'],
             'isRead': order['status'] != 'pending_payment',
             'avatar': images != null && images.isNotEmpty ? images[0] : null,
@@ -1150,20 +1180,22 @@ class SupabaseService {
         }
       }
 
-      // Map exchanges to notification format
+      // Map exchanges (already joined!)
       for (var exchange in exchangesResponse) {
         try {
-          final productRes = await Supabase.instance.client.from('products').select('title, images').eq('id', exchange['target_product_id']).maybeSingle();
-          final requesterRes = await Supabase.instance.client.from('user_profiles').select('full_name').eq('id', exchange['requester_id']).maybeSingle();
+          final productData = exchange['products'] as Map<String, dynamic>?;
+          final requesterData = exchange['user_profiles'] as Map<String, dynamic>?;
 
-          final images = productRes?['images'] as List?;
+          final title = productData?['title']?.toString() ?? 'produit';
+          final images = productData?['images'] as List?;
+          final requesterName = requesterData?['full_name']?.toString() ?? 'Un utilisateur';
 
           allNotifications.add({
             'id': 'exchange_${exchange['id']}',
             'type': 'exchange_proposal',
             'category': 'Propositions',
             'title': 'Nouvel échange proposé',
-            'message': '${requesterRes?['full_name'] ?? 'Un utilisateur'} propose un échange pour votre ${productRes?['title'] ?? 'produit'}',
+            'message': '$requesterName propose un échange pour votre $title',
             'timestamp': exchange['created_at'],
             'isRead': false,
             'avatar': images != null && images.isNotEmpty ? images[0] : null,
@@ -1175,14 +1207,15 @@ class SupabaseService {
         }
       }
 
-      // Sort everything by date
+      // Sort by timestamp descending
       allNotifications.sort((a, b) => DateTime.parse(b['timestamp']).compareTo(DateTime.parse(a['timestamp'])));
 
       return allNotifications;
     } catch (e) {
       print('DEBUG: Error fetching notifications: $e');
-      throw e; // Rethrow to show in UI
+      return [];
     }
+  }
   }
 
   /// Update user payout method (Wave, Orange Money, etc.)
