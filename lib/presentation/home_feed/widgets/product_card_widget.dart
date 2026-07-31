@@ -506,8 +506,8 @@ class _ProductCardWidgetState extends State<ProductCardWidget> {
                   ),
                 ],
               ),
-            ),
             SizedBox(height: 4.0),
+          ],
         ),
       ),
     );
