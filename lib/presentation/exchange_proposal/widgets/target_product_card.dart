@@ -108,6 +108,35 @@ class TargetProductCard extends StatelessWidget {
 
                       SizedBox(height: 17.0),
 
+                      // Condition and Size Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailItem(
+                              context,
+                              icon: Icons.check_circle_outline,
+                              label: 'État du produit',
+                              value: _formatCondition(
+                                targetProduct['product_condition']?.toString() ??
+                                targetProduct['condition']?.toString() ??
+                                targetProduct['etat']?.toString(),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12.0),
+                          Expanded(
+                            child: _buildDetailItem(
+                              context,
+                              icon: Icons.straighten_outlined,
+                              label: 'Taille / Pointure',
+                              value: _extractSize(targetProduct) ?? 'Non spécifiée',
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: 17.0),
+
                       // Owner Information
                       _buildDetailItem(
                         context,
@@ -243,5 +272,36 @@ class TargetProductCard extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _formatCondition(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 'Non spécifié';
+    final clean = raw.trim().toLowerCase().replaceAll('-', '_');
+    switch (clean) {
+      case 'neuf':
+        return 'Neuf';
+      case 'tres_bon_etat':
+      case 'très bon état':
+        return 'Très bon état';
+      case 'bon_etat':
+      case 'bon état':
+        return 'Bon état';
+      case 'etat_correct':
+      case 'état correct':
+        return 'État correct';
+      case 'a_reparer':
+      case 'à réparer':
+        return 'À réparer';
+      default:
+        return raw;
+    }
+  }
+
+  String? _extractSize(Map<String, dynamic> product) {
+    final sizeVal = product['size'] ?? product['taille'] ?? product['product_size'];
+    if (sizeVal != null && sizeVal.toString().trim().isNotEmpty) {
+      return sizeVal.toString().trim();
+    }
+    return null;
   }
 }
