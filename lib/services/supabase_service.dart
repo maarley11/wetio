@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../core/app_export.dart';
 import 'package:path_provider/path_provider.dart'
     if (dart.library.html) 'package:wetio/stubs/path_provider_stub.dart';
+import 'notification_service.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;
