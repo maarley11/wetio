@@ -1047,191 +1047,197 @@ class SupabaseService {
     }
   }
 
-  /// Get all notifications for the current user (orders, exchanges, and deliveries) - Fast parallel fetch
+  /// Get all notifications for the current user (orders, exchanges, and deliveries) - Bulletproof safe fetch
   static Future<List<Map<String, dynamic>>> getNotifications() async {
     try {
       final user = getCurrentUser();
       if (user == null) return [];
 
-      // Run root queries in parallel for instant sub-second loading!
-      final results = await Future.wait([
-        // 0. Fetch product sales AND purchase orders with joined product and buyer profile
-        Supabase.instance.client
+      List<Map<String, dynamic>> allNotifications = [];
+
+      // 1. Fetch Product Orders (Sales + Purchases) safely
+      try {
+        final ordersRaw = await Supabase.instance.client
             .from('product_orders')
-            .select('*, products(title, images), user_profiles!buyer_id(full_name, phone)')
+            .select('*')
             .or('seller_id.eq.${user.id},buyer_id.eq.${user.id}')
-            .order('created_at', ascending: false)
-            .catchError((_) => []),
+            .order('created_at', ascending: false);
 
-        // 1. Fetch exchange proposals (received AND sent) with joined target product and requester profile
-        Supabase.instance.client
+        for (var order in (ordersRaw as List)) {
+          try {
+            final productId = order['product_id']?.toString();
+            final buyerId = order['buyer_id']?.toString();
+            final isSeller = order['seller_id'] == user.id;
+
+            Map<String, dynamic>? productData;
+            Map<String, dynamic>? buyerData;
+
+            if (productId != null && productId.isNotEmpty) {
+              productData = await Supabase.instance.client
+                  .from('products')
+                  .select('title, images')
+                  .eq('id', productId)
+                  .maybeSingle();
+            }
+
+            if (buyerId != null && buyerId.isNotEmpty) {
+              buyerData = await Supabase.instance.client
+                  .from('user_profiles')
+                  .select('full_name, pseudo, phone')
+                  .eq('id', buyerId)
+                  .maybeSingle();
+            }
+
+            final title = productData?['title']?.toString() ?? 'produit';
+            final images = productData?['images'] as List?;
+            final buyerName = buyerData?['full_name']?.toString() ?? buyerData?['pseudo']?.toString() ?? 'Un client';
+
+            final Map<String, dynamic> extendedOrder = Map<String, dynamic>.from(order);
+            extendedOrder['buyer_name'] = buyerName;
+            extendedOrder['buyer_phone'] = buyerData?['phone'];
+            extendedOrder['product_title'] = title;
+
+            allNotifications.add({
+              'id': 'order_${order['id']}',
+              'type': 'order',
+              'category': 'Ventes',
+              'title': isSeller ? 'Nouvel achat !' : 'Commande effectuée',
+              'message': isSeller 
+                  ? '$buyerName a acheté votre $title' 
+                  : 'Votre commande pour $title a été enregistrée',
+              'timestamp': order['created_at'],
+              'isRead': !isSeller || order['status'] != 'pending_payment',
+              'avatar': images != null && images.isNotEmpty ? images[0] : null,
+              'accentColor': const Color(0xFF4CAF50),
+              'data': extendedOrder,
+            });
+          } catch (e) {
+            print('DEBUG: Error parsing order: $e');
+          }
+        }
+      } catch (e) {
+        print('DEBUG: Error querying product_orders: $e');
+      }
+
+      // 2. Fetch Exchange Proposals (Received + Sent) safely
+      try {
+        final exchangesRaw = await Supabase.instance.client
             .from('exchanges')
-            .select('*, products!target_product_id(title, images), user_profiles!requester_id(full_name)')
+            .select('*')
             .or('owner_id.eq.${user.id},requester_id.eq.${user.id}')
-            .order('created_at', ascending: false)
-            .catchError((_) => []),
+            .order('created_at', ascending: false);
 
-        // 2. Fetch delivery status updates
-        Supabase.instance.client
+        for (var exchange in (exchangesRaw as List)) {
+          try {
+            final targetProductId = exchange['target_product_id']?.toString();
+            final requesterId = exchange['requester_id']?.toString();
+            final isOwner = exchange['owner_id'] == user.id;
+            final status = exchange['status']?.toString() ?? 'en_attente';
+
+            Map<String, dynamic>? productData;
+            Map<String, dynamic>? requesterData;
+
+            if (targetProductId != null && targetProductId.isNotEmpty) {
+              productData = await Supabase.instance.client
+                  .from('products')
+                  .select('title, images')
+                  .eq('id', targetProductId)
+                  .maybeSingle();
+            }
+
+            if (requesterId != null && requesterId.isNotEmpty) {
+              requesterData = await Supabase.instance.client
+                  .from('user_profiles')
+                  .select('full_name, pseudo')
+                  .eq('id', requesterId)
+                  .maybeSingle();
+            }
+
+            final title = productData?['title']?.toString() ?? 'produit';
+            final images = productData?['images'] as List?;
+            final requesterName = requesterData?['full_name']?.toString() ?? requesterData?['pseudo']?.toString() ?? 'Un utilisateur';
+
+            allNotifications.add({
+              'id': 'exchange_${exchange['id']}',
+              'type': 'exchange_proposal',
+              'category': 'Propositions',
+              'title': isOwner ? 'Nouvel échange proposé' : 'Proposition d\'échange envoyée',
+              'message': isOwner 
+                  ? '$requesterName propose un échange pour votre $title'
+                  : 'Votre proposition d\'échange pour $title est en cours ($status)',
+              'timestamp': exchange['created_at'],
+              'isRead': !isOwner || status != 'en_attente',
+              'avatar': images != null && images.isNotEmpty ? images[0] : null,
+              'accentColor': const Color(0xFFFF7043),
+              'data': exchange,
+            });
+          } catch (e) {
+            print('DEBUG: Error parsing exchange: $e');
+          }
+        }
+      } catch (e) {
+        print('DEBUG: Error querying exchanges: $e');
+      }
+
+      // 3. Fetch Delivery Requests safely
+      try {
+        final deliveryRaw = await Supabase.instance.client
             .from('delivery_requests')
             .select('*')
             .or('person_a_id.eq.${user.id},person_b_id.eq.${user.id}')
             .neq('delivery_status', 'en_attente')
-            .order('updated_at', ascending: false)
-            .catchError((_) => []),
+            .order('updated_at', ascending: false);
 
-        // 3. User profile check for delivery partner status
-        Supabase.instance.client
-            .from('user_profiles')
-            .select('is_delivery_partner')
-            .eq('id', user.id)
-            .maybeSingle()
-            .catchError((_) => null),
-      ]);
+        for (var req in (deliveryRaw as List)) {
+          final status = req['delivery_status'];
+          final timestampStr = (req['updated_at'] ?? req['created_at']).toString();
+          final baseTimestamp = DateTime.parse(timestampStr);
 
-      final ordersResponse = (results[0] as List?) ?? [];
-      final exchangesResponse = (results[1] as List?) ?? [];
-      final sentRequestsResponse = (results[2] as List?) ?? [];
-      final profile = results[3] as Map<String, dynamic>?;
-
-      List<Map<String, dynamic>> allNotifications = [];
-
-      // Delivery partner pending requests
-      if (profile != null && profile['is_delivery_partner'] == true) {
-        try {
-          final deliveryRequests = await getMyDeliveryRequests();
-          for (var req in deliveryRequests) {
-            if (req['delivery_status'] == 'en_attente') {
-              allNotifications.add({
-                'id': 'delivery_${req['id']}',
-                'type': 'delivery_request',
-                'category': 'Livraisons',
-                'title': 'NOUVELLE LIVRAISON DISPONIBLE',
-                'message': 'Une nouvelle demande de livraison attend votre acceptation.',
-                'timestamp': req['created_at'],
-                'isRead': false,
-                'accentColor': const Color(0xFF2196F3),
-                'data': req,
-              });
-            }
+          if (status == 'accepted' || status == 'recupere' || status == 'terminee') {
+            allNotifications.add({
+              'id': 'sent_delivery_acc_${req['id']}',
+              'type': 'delivery_status_update',
+              'category': 'Livraisons',
+              'title': "LIVRAISON ACCEPTÉE !",
+              'message': "Un livreur a accepté de prendre en charge votre échange.",
+              'timestamp': baseTimestamp.subtract(const Duration(minutes: 5)).toIso8601String(),
+              'isRead': true,
+              'accentColor': const Color(0xFF2196F3),
+              'data': req,
+            });
           }
-        } catch (_) {}
-      }
 
-      // Delivery status updates
-      for (var req in sentRequestsResponse) {
-        final status = req['delivery_status'];
-        final timestampStr = (req['updated_at'] ?? req['created_at']).toString();
-        final baseTimestamp = DateTime.parse(timestampStr);
+          if (status == 'recupere' || status == 'terminee') {
+            final pin = req['verification_pin'] ?? '----';
+            allNotifications.add({
+              'id': 'sent_delivery_rec_${req['id']}',
+              'type': 'delivery_status_update',
+              'category': 'Livraisons',
+              'title': "COLIS RÉCUPÉRÉ !",
+              'message': "Votre colis est en route. CODE PIN : $pin (à donner au livreur à la réception).",
+              'timestamp': baseTimestamp.subtract(const Duration(minutes: 2)).toIso8601String(),
+              'isRead': status == 'terminee',
+              'accentColor': const Color(0xFF2196F3),
+              'data': req,
+            });
+          }
 
-        if (status == 'accepted' || status == 'recupere' || status == 'terminee') {
-          allNotifications.add({
-            'id': 'sent_delivery_acc_${req['id']}',
-            'type': 'delivery_status_update',
-            'category': 'Livraisons',
-            'title': "LIVRAISON ACCEPTÉE !",
-            'message': "Un livreur a accepté de prendre en charge votre échange.",
-            'timestamp': baseTimestamp.subtract(const Duration(minutes: 5)).toIso8601String(),
-            'isRead': true,
-            'accentColor': const Color(0xFF2196F3),
-            'data': req,
-          });
+          if (status == 'terminee') {
+            allNotifications.add({
+              'id': 'sent_delivery_fin_${req['id']}',
+              'type': 'delivery_status_update',
+              'category': 'Livraisons',
+              'title': "LIVRAISON TERMINÉE",
+              'message': "Votre colis a été livré avec succès.",
+              'timestamp': baseTimestamp.toIso8601String(),
+              'isRead': false,
+              'accentColor': AppTheme.successGreen,
+              'data': req,
+            });
+          }
         }
-
-        if (status == 'recupere' || status == 'terminee') {
-          final pin = req['verification_pin'] ?? '----';
-          allNotifications.add({
-            'id': 'sent_delivery_rec_${req['id']}',
-            'type': 'delivery_status_update',
-            'category': 'Livraisons',
-            'title': "COLIS RÉCUPÉRÉ !",
-            'message': "Votre colis est en route. CODE PIN : $pin (à donner au livreur à la réception).",
-            'timestamp': baseTimestamp.subtract(const Duration(minutes: 2)).toIso8601String(),
-            'isRead': status == 'terminee',
-            'accentColor': const Color(0xFF2196F3),
-            'data': req,
-          });
-        }
-
-        if (status == 'terminee') {
-          allNotifications.add({
-            'id': 'sent_delivery_fin_${req['id']}',
-            'type': 'delivery_status_update',
-            'category': 'Livraisons',
-            'title': "LIVRAISON TERMINÉE",
-            'message': "Votre colis a été livré avec succès.",
-            'timestamp': baseTimestamp.toIso8601String(),
-            'isRead': false,
-            'accentColor': AppTheme.successGreen,
-            'data': req,
-          });
-        }
-      }
-
-      // Map orders (sales + purchases)
-      for (var order in ordersResponse) {
-        try {
-          final productData = order['products'] as Map<String, dynamic>?;
-          final buyerData = order['user_profiles'] as Map<String, dynamic>?;
-
-          final title = productData?['title']?.toString() ?? 'produit';
-          final images = productData?['images'] as List?;
-          final buyerName = buyerData?['full_name']?.toString() ?? 'Un client';
-          final isSeller = order['seller_id'] == user.id;
-
-          final Map<String, dynamic> extendedOrder = Map<String, dynamic>.from(order);
-          extendedOrder['buyer_name'] = buyerName;
-          extendedOrder['buyer_phone'] = buyerData?['phone'];
-          extendedOrder['product_title'] = title;
-
-          allNotifications.add({
-            'id': 'order_${order['id']}',
-            'type': 'order',
-            'category': 'Ventes',
-            'title': isSeller ? 'Nouvel achat !' : 'Commande effectuée',
-            'message': isSeller 
-                ? '$buyerName a acheté votre $title' 
-                : 'Votre commande pour $title a été enregistrée',
-            'timestamp': order['created_at'],
-            'isRead': !isSeller || order['status'] != 'pending_payment',
-            'avatar': images != null && images.isNotEmpty ? images[0] : null,
-            'accentColor': const Color(0xFF4CAF50),
-            'data': extendedOrder,
-          });
-        } catch (e) {
-          print('DEBUG: Error mapping order ${order['id']}: $e');
-        }
-      }
-
-      // Map exchanges (received + sent)
-      for (var exchange in exchangesResponse) {
-        try {
-          final productData = exchange['products'] as Map<String, dynamic>?;
-          final requesterData = exchange['user_profiles'] as Map<String, dynamic>?;
-
-          final title = productData?['title']?.toString() ?? 'produit';
-          final images = productData?['images'] as List?;
-          final requesterName = requesterData?['full_name']?.toString() ?? 'Un utilisateur';
-          final isOwner = exchange['owner_id'] == user.id;
-          final status = exchange['status']?.toString() ?? 'en_attente';
-
-          allNotifications.add({
-            'id': 'exchange_${exchange['id']}',
-            'type': 'exchange_proposal',
-            'category': 'Propositions',
-            'title': isOwner ? 'Nouvel échange proposé' : 'Proposition d\'échange envoyée',
-            'message': isOwner 
-                ? '$requesterName propose un échange pour votre $title'
-                : 'Votre proposition d\'échange pour $title est en cours ($status)',
-            'timestamp': exchange['created_at'],
-            'isRead': !isOwner || status != 'en_attente',
-            'avatar': images != null && images.isNotEmpty ? images[0] : null,
-            'accentColor': const Color(0xFFFF7043),
-            'data': exchange,
-          });
-        } catch (e) {
-          print('DEBUG: Error mapping exchange ${exchange['id']}: $e');
-        }
+      } catch (e) {
+        print('DEBUG: Error querying delivery_requests: $e');
       }
 
       // Sort by timestamp descending
