@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
 import '../../services/ad_banner_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../widgets/auth_guard.dart';
@@ -122,6 +123,11 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
     setState(() {
       _isLoading = true;
     });
+
+    final user = SupabaseService.getCurrentUser();
+    if (user != null) {
+      NotificationService.bindUser(user.id);
+    }
 
     _loadProductsFromSupabase();
     _loadUnreadNotificationCount();

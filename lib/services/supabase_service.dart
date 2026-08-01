@@ -977,6 +977,7 @@ class SupabaseService {
   }
 
   /// Create a new product order (Manual/Local payment)
+  /// Create a new product order (Manual/Local payment)
   static Future<Map<String, dynamic>> createOrder({
     required String productId,
     required String sellerId,
@@ -1006,6 +1007,25 @@ class SupabaseService {
           .select()
           .single();
 
+      // Trigger push notification to seller's phone screen
+      try {
+        final buyerProfile = await Supabase.instance.client
+            .from('user_profiles')
+            .select('full_name, pseudo')
+            .eq('id', user.id)
+            .maybeSingle();
+        final buyerName = buyerProfile?['full_name'] ?? buyerProfile?['pseudo'] ?? 'Un client';
+
+        NotificationService.sendPushNotification(
+          recipientUserId: sellerId,
+          title: '🛍️ Nouvel achat !',
+          body: '$buyerName vient d\'acheter votre produit ($totalAmount FCFA).',
+          data: {'type': 'order', 'orderId': response['id']},
+        );
+      } catch (err) {
+        print('Error triggering order push: $err');
+      }
+
       return response;
     } catch (e) {
       throw Exception('Failed to create order: $e');
@@ -1034,20 +1054,19 @@ class SupabaseService {
 
       // Run root queries in parallel for instant sub-second loading!
       final results = await Future.wait([
-        // 0. Fetch product sales orders with joined product and buyer profile
+        // 0. Fetch product sales AND purchase orders with joined product and buyer profile
         Supabase.instance.client
             .from('product_orders')
             .select('*, products(title, images), user_profiles!buyer_id(full_name, phone)')
-            .eq('seller_id', user.id)
+            .or('seller_id.eq.${user.id},buyer_id.eq.${user.id}')
             .order('created_at', ascending: false)
             .catchError((_) => []),
 
-        // 1. Fetch exchange proposals with joined target product and requester profile
+        // 1. Fetch exchange proposals (received AND sent) with joined target product and requester profile
         Supabase.instance.client
             .from('exchanges')
             .select('*, products!target_product_id(title, images), user_profiles!requester_id(full_name)')
-            .eq('owner_id', user.id)
-            .eq('status', 'en_attente')
+            .or('owner_id.eq.${user.id},requester_id.eq.${user.id}')
             .order('created_at', ascending: false)
             .catchError((_) => []),
 
@@ -1148,7 +1167,7 @@ class SupabaseService {
         }
       }
 
-      // Map orders (already joined!)
+      // Map orders (sales + purchases)
       for (var order in ordersResponse) {
         try {
           final productData = order['products'] as Map<String, dynamic>?;
@@ -1157,6 +1176,7 @@ class SupabaseService {
           final title = productData?['title']?.toString() ?? 'produit';
           final images = productData?['images'] as List?;
           final buyerName = buyerData?['full_name']?.toString() ?? 'Un client';
+          final isSeller = order['seller_id'] == user.id;
 
           final Map<String, dynamic> extendedOrder = Map<String, dynamic>.from(order);
           extendedOrder['buyer_name'] = buyerName;
@@ -1167,10 +1187,12 @@ class SupabaseService {
             'id': 'order_${order['id']}',
             'type': 'order',
             'category': 'Ventes',
-            'title': 'Nouvel achat !',
-            'message': '$buyerName a acheté votre $title',
+            'title': isSeller ? 'Nouvel achat !' : 'Commande effectuée',
+            'message': isSeller 
+                ? '$buyerName a acheté votre $title' 
+                : 'Votre commande pour $title a été enregistrée',
             'timestamp': order['created_at'],
-            'isRead': order['status'] != 'pending_payment',
+            'isRead': !isSeller || order['status'] != 'pending_payment',
             'avatar': images != null && images.isNotEmpty ? images[0] : null,
             'accentColor': const Color(0xFF4CAF50),
             'data': extendedOrder,
@@ -1180,7 +1202,7 @@ class SupabaseService {
         }
       }
 
-      // Map exchanges (already joined!)
+      // Map exchanges (received + sent)
       for (var exchange in exchangesResponse) {
         try {
           final productData = exchange['products'] as Map<String, dynamic>?;
@@ -1189,15 +1211,19 @@ class SupabaseService {
           final title = productData?['title']?.toString() ?? 'produit';
           final images = productData?['images'] as List?;
           final requesterName = requesterData?['full_name']?.toString() ?? 'Un utilisateur';
+          final isOwner = exchange['owner_id'] == user.id;
+          final status = exchange['status']?.toString() ?? 'en_attente';
 
           allNotifications.add({
             'id': 'exchange_${exchange['id']}',
             'type': 'exchange_proposal',
             'category': 'Propositions',
-            'title': 'Nouvel échange proposé',
-            'message': '$requesterName propose un échange pour votre $title',
+            'title': isOwner ? 'Nouvel échange proposé' : 'Proposition d\'échange envoyée',
+            'message': isOwner 
+                ? '$requesterName propose un échange pour votre $title'
+                : 'Votre proposition d\'échange pour $title est en cours ($status)',
             'timestamp': exchange['created_at'],
-            'isRead': false,
+            'isRead': !isOwner || status != 'en_attente',
             'avatar': images != null && images.isNotEmpty ? images[0] : null,
             'accentColor': const Color(0xFFFF7043),
             'data': exchange,
@@ -1351,6 +1377,25 @@ class SupabaseService {
         'delivery_address': deliveryAddress,
         'status': 'en_attente',
       });
+
+      // Trigger push notification to owner's phone screen
+      try {
+        final requesterProfile = await Supabase.instance.client
+            .from('user_profiles')
+            .select('full_name, pseudo')
+            .eq('id', user.id)
+            .maybeSingle();
+        final requesterName = requesterProfile?['full_name'] ?? requesterProfile?['pseudo'] ?? 'Un utilisateur';
+
+        NotificationService.sendPushNotification(
+          recipientUserId: ownerId,
+          title: '🤝 Nouvelle proposition d\'échange !',
+          body: '$requesterName vous propose un échange sur votre annonce.',
+          data: {'type': 'exchange_proposal'},
+        );
+      } catch (err) {
+        print('Error triggering exchange proposal push: $err');
+      }
     } catch (e) {
       print('Error creating exchange proposal: $e');
       throw e;
