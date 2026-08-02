@@ -100,27 +100,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _handleNotificationTap(Map<String, dynamic> notification) {
     _markAsRead(notification['id']);
 
+    final notifData = notification['data'] as Map<String, dynamic>?;
+
     // Navigate based on notification type
     switch (notification['type']) {
       case 'exchange_proposal':
-        final exchangeData = notification['data'] as Map<String, dynamic>;
-        Navigator.pushNamed(
-          context, 
-          AppRoutes.exchangeProposal,
-          arguments: {'exchangeId': exchangeData['id']},
-        );
+        if (notifData != null && notifData['id'] != null) {
+          Navigator.pushNamed(
+            context, 
+            AppRoutes.exchangeProposal,
+            arguments: {'exchangeId': notifData['id']},
+          );
+        }
         break;
       case 'order':
-        _showOrderDetails(notification['data']);
+        if (notifData != null) {
+          _showOrderDetails(notifData);
+        }
         break;
       case 'message':
-        Navigator.pushNamed(context, AppRoutes.exchangeConversationActions);
+      case 'chat':
+        Navigator.pushNamed(context, AppRoutes.chatMessagesHub);
         break;
       case 'delivery':
-        // Navigate to delivery tracking
+      case 'delivery_status_update':
+        if (notifData != null && notifData['id'] != null) {
+          Navigator.pushNamed(
+            context,
+            AppRoutes.threeStepDeliveryCoordinationScreen,
+            arguments: {'deliveryRequestId': notifData['id']},
+          );
+        }
         break;
       case 'system':
-        // Show system notification details
         break;
     }
   }

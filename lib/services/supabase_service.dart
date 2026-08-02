@@ -1306,11 +1306,15 @@ class SupabaseService {
             .order('updated_at', ascending: false);
 
         for (var req in (deliveryRaw as List)) {
-          final status = req['delivery_status'];
+          final status = req['delivery_status']?.toString() ?? '';
           final timestampStr = (req['updated_at'] ?? req['created_at']).toString();
           final baseTimestamp = DateTime.parse(timestampStr);
 
-          if (status == 'accepted' || status == 'recupere' || status == 'terminee') {
+          final isAccepted = status == 'acceptee' || status == 'accepted' || status == 'colis_a_recupere' || status == 'recuperee' || status == 'recupere' || status == 'colis_b_recupere' || status == 'terminee';
+          final isRecupere = status == 'colis_a_recupere' || status == 'recuperee' || status == 'recupere' || status == 'colis_b_recupere' || status == 'terminee';
+          final isTerminee = status == 'terminee' || status == 'completed';
+
+          if (isAccepted) {
             allNotifications.add({
               'id': 'sent_delivery_acc_${req['id']}',
               'type': 'delivery_status_update',
@@ -1324,14 +1328,14 @@ class SupabaseService {
             });
           }
 
-          if (status == 'recupere' || status == 'terminee') {
+          if (isRecupere) {
             final pin = req['verification_pin'] ?? '----';
             allNotifications.add({
               'id': 'sent_delivery_rec_${req['id']}',
               'type': 'delivery_status_update',
               'category': 'Livraisons',
-              'title': "COLIS RÉCUPÉRÉ !",
-              'message': "Votre colis est en route. CODE PIN : $pin (à donner au livreur à la réception).",
+              'title': "COLIS RÉCUPÉRÉ EN COURS !",
+              'message': "Le livreur a récupéré le colis et effectue le double échange. CODE PIN : $pin.",
               'timestamp': baseTimestamp.subtract(const Duration(minutes: 2)).toIso8601String(),
               'isRead': status == 'terminee',
               'accentColor': const Color(0xFF2196F3),
@@ -1339,13 +1343,13 @@ class SupabaseService {
             });
           }
 
-          if (status == 'terminee') {
+          if (isTerminee) {
             allNotifications.add({
               'id': 'sent_delivery_fin_${req['id']}',
               'type': 'delivery_status_update',
               'category': 'Livraisons',
-              'title': "LIVRAISON TERMINÉE",
-              'message': "Votre colis a été livré avec succès.",
+              'title': "LIVRAISON TERMINÉE !",
+              'message': "Votre livraison a été validée avec succès. Kaywetio vous remercie pour votre confiance ! À très vite pour un nouvel échange ! 🤝",
               'timestamp': baseTimestamp.toIso8601String(),
               'isRead': false,
               'accentColor': AppTheme.successGreen,

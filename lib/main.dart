@@ -37,6 +37,9 @@ void main() async {
   // Initialize OneSignal AFTER Supabase so current user can be bound immediately
   await NotificationService.init();
 
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  NotificationService.setNavigatorKey(navigatorKey);
+
   bool _hasShownError = false;
 
   // 🚨 CRITICAL: Custom error handling - DO NOT REMOVE
@@ -76,6 +79,7 @@ class MyApp extends StatelessWidget {
             child: Sizer(
               builder: (context, orientation, screenType) {
         return MaterialApp(
+          navigatorKey: NotificationService.navigatorKey,
           title: 'wetio',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
