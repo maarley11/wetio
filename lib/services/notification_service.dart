@@ -55,10 +55,8 @@ class NotificationService {
     if (recipientUserId.isEmpty) return;
 
     try {
-      const restApiKey = String.fromEnvironment(
-        'ONESIGNAL_REST_API_KEY',
-        defaultValue: _defaultRestApiKey,
-      );
+      const envApiKey = String.fromEnvironment('ONESIGNAL_REST_API_KEY', defaultValue: '');
+      final restApiKey = envApiKey.isNotEmpty ? envApiKey : _defaultRestApiKey;
       final authHeader = restApiKey.startsWith('os_v2_app_')
           ? 'Key $restApiKey'
           : 'Basic $restApiKey';
