@@ -486,6 +486,55 @@ class SupabaseService {
           .update({'delivery_status': status, 'updated_at': DateTime.now().toIso8601String()})
           .eq('id', requestId);
       
+      // Trigger Push Notifications to Person A & Person B for all status updates
+      try {
+        final delReq = await client
+            .from('delivery_requests')
+            .select('person_a_id, person_b_id, partner_user_id')
+            .eq('id', requestId)
+            .maybeSingle();
+
+        if (delReq != null) {
+          final personAId = delReq['person_a_id']?.toString();
+          final personBId = delReq['person_b_id']?.toString();
+          final courierId = delReq['partner_user_id']?.toString();
+
+          String courierName = 'Le livreur';
+          if (courierId != null && courierId.isNotEmpty) {
+            final courierProfile = await getUserProfile(courierId);
+            courierName = courierProfile?['full_name'] ?? courierProfile?['pseudo'] ?? 'Le livreur';
+          }
+
+          String pushTitle = '';
+          String pushBody = '';
+
+          if (status == 'acceptee') {
+            pushTitle = '🚚 Livreur attribué !';
+            pushBody = '$courierName a accepté de prendre en charge votre livraison. Il est en route !';
+          } else if (status == 'recuperee') {
+            pushTitle = '📦 Colis récupéré !';
+            pushBody = '$courierName a récupéré le colis. Il se dirige vers l\'adresse de livraison.';
+          } else if (status == 'terminee') {
+            pushTitle = '🎉 Livraison terminée !';
+            pushBody = 'Votre livraison a été validée avec succès. Kaywetio vous remercie pour votre confiance ! À très vite pour un nouvel échange ! 🤝';
+          }
+
+          if (pushTitle.isNotEmpty) {
+            final recipients = {if (personAId != null && personAId.isNotEmpty) personAId, if (personBId != null && personBId.isNotEmpty) personBId};
+            for (final recipientId in recipients) {
+              NotificationService.sendPushNotification(
+                recipientUserId: recipientId,
+                title: pushTitle,
+                body: pushBody,
+                data: {'type': 'delivery_status', 'deliveryId': requestId, 'status': status},
+              );
+            }
+          }
+        }
+      } catch (pushErr) {
+        print('Error sending delivery status push: $pushErr');
+      }
+
       return {'success': true, 'message': 'Statut mis à jour avec succès.'};
     } catch (e) {
       print('Error updating delivery request status: $e');
