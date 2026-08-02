@@ -69,7 +69,6 @@ class NotificationService {
         },
         body: jsonEncode({
           'app_id': _oneSignalAppId,
-          'include_external_user_ids': [recipientUserId],
           'include_aliases': {
             'external_id': [recipientUserId],
           },

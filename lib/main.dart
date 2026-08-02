@@ -14,9 +14,6 @@ import './widgets/custom_error_widget.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize NotificationService & OneSignal Push Notifications
-  await NotificationService.init();
-
   // Initialize Stripe
   const stripePublishableKey = String.fromEnvironment(
     'STRIPE_PUBLISHABLE_KEY',
@@ -29,13 +26,16 @@ void main() async {
     }
   }
 
-  // Initialize Supabase - gracefully handle failures
+  // Initialize Supabase FIRST - gracefully handle failures
   try {
     await SupabaseService.initialize();
   } catch (e) {
     debugPrint('Failed to initialize Supabase: $e');
     // Continue app launch even if Supabase fails
   }
+
+  // Initialize OneSignal AFTER Supabase so current user can be bound immediately
+  await NotificationService.init();
 
   bool _hasShownError = false;
 

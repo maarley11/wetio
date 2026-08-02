@@ -5,6 +5,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/app_language_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
 import './widgets/login_form_widget.dart';
 import './widgets/social_login_widget.dart';
@@ -49,6 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.user != null) {
         print('✅ Utilisateur connecté avec succès: ${response.user!.email}');
+
+        // Bind user to OneSignal immediately so push notifications reach this device
+        NotificationService.bindUser(response.user!.id);
 
         HapticFeedback.mediumImpact();
 
