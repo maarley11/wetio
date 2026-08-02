@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/app_theme.dart';
+import '../../services/notification_service.dart';
 import './widgets/step_progress_widget.dart';
 import './widgets/code_display_card_widget.dart';
 import './widgets/code_validation_widget.dart';
@@ -189,8 +190,52 @@ class _ThreeStepDeliveryCoordinationScreenState
       await supabase
           .from('delivery_requests')
           .update({'current_step': step}).eq('id', _deliveryRequestId!);
+
+      // Send push notifications for each step to both users
+      await _sendStepPushNotifications(step);
     } catch (e) {
       debugPrint('Error updating step: $e');
+    }
+  }
+
+  Future<void> _sendStepPushNotifications(int step) async {
+    if (_deliveryRequestId == null) return;
+    try {
+      final req = await supabase
+          .from('delivery_requests')
+          .select('person_a_id, person_b_id')
+          .eq('id', _deliveryRequestId!)
+          .maybeSingle();
+      if (req == null) return;
+
+      final personAId = req['person_a_id']?.toString() ?? '';
+      final personBId = req['person_b_id']?.toString() ?? '';
+
+      String title = '';
+      String body = '';
+
+      if (step == 1) {
+        // Livreur vient de récupérer le colis chez Person A (Gass)
+        title = '📦 Colis récupéré !';
+        body = 'Le livreur a récupéré le colis chez $_personAName et est en route. Les deux colis seront échangés ensemble.';
+      } else if (step == 2) {
+        // Livreur vient de livrer à Person B (Ngary) et a récupéré son colis
+        title = '🔄 Échange en cours !';
+        body = 'Le livreur a remis le colis à $_personBName et récupère le sien. Il est maintenant en route vers $_personAName !';
+      }
+
+      if (title.isNotEmpty) {
+        for (final uid in {personAId, personBId}.where((id) => id.isNotEmpty)) {
+          NotificationService.sendPushNotification(
+            recipientUserId: uid,
+            title: title,
+            body: body,
+            data: {'type': 'delivery_status', 'deliveryId': _deliveryRequestId!, 'step': step.toString()},
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error sending step push: $e');
     }
   }
 
@@ -201,6 +246,29 @@ class _ThreeStepDeliveryCoordinationScreenState
           'current_step': 3,
           'delivery_status': 'completed',
         }).eq('id', _deliveryRequestId!);
+
+        // Send final push to BOTH users
+        try {
+          final req = await supabase
+              .from('delivery_requests')
+              .select('person_a_id, person_b_id')
+              .eq('id', _deliveryRequestId!)
+              .maybeSingle();
+          if (req != null) {
+            final personAId = req['person_a_id']?.toString() ?? '';
+            final personBId = req['person_b_id']?.toString() ?? '';
+            for (final uid in {personAId, personBId}.where((id) => id.isNotEmpty)) {
+              NotificationService.sendPushNotification(
+                recipientUserId: uid,
+                title: '🎉 Livraison terminée !',
+                body: 'Le double échange a été réalisé avec succès ! Kaywetio vous remercie pour votre confiance. À très vite ! 🤝',
+                data: {'type': 'delivery_status', 'deliveryId': _deliveryRequestId!, 'status': 'completed'},
+              );
+            }
+          }
+        } catch (pushErr) {
+          debugPrint('Error sending completion push: $pushErr');
+        }
       }
       if (mounted) {
         setState(() {
