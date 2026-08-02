@@ -231,10 +231,14 @@ class _ExchangeProposalState extends State<ExchangeProposal>
 
     try {
       final targetProductId = _targetProduct?['id']?.toString();
-      final ownerId = _targetProduct?['owner_id']?.toString() ?? _targetProduct?['owner']?['id']?.toString();
+      final ownerId = _targetProduct?['owner_id']?.toString() ?? 
+                      _targetProduct?['owner']?['id']?.toString() ??
+                      _targetProduct?['user_id']?.toString() ??
+                      _targetProduct?['userId']?.toString() ??
+                      _targetProduct?['ownerId']?.toString() ?? '';
       final requesterProductId = _selectedProducts.first['id']?.toString();
 
-      if (targetProductId == null || ownerId == null || requesterProductId == null) {
+      if (targetProductId == null || requesterProductId == null) {
         throw Exception("Informations du produit manquantes");
       }
 

@@ -978,7 +978,6 @@ class SupabaseService {
   }
 
   /// Create a new product order (Manual/Local payment)
-  /// Create a new product order (Manual/Local payment)
   static Future<Map<String, dynamic>> createOrder({
     required String productId,
     required String sellerId,
@@ -992,11 +991,24 @@ class SupabaseService {
       final user = getCurrentUser();
       if (user == null) throw Exception('User not authenticated');
 
+      // Resolve real seller_id directly from products table if missing/null to guarantee receipt
+      String finalSellerId = sellerId;
+      if (finalSellerId.isEmpty || finalSellerId == 'null') {
+        try {
+          final prodData = await Supabase.instance.client
+              .from('products')
+              .select('owner_id, user_id')
+              .eq('id', productId)
+              .maybeSingle();
+          finalSellerId = prodData?['owner_id']?.toString() ?? prodData?['user_id']?.toString() ?? sellerId;
+        } catch (_) {}
+      }
+
       final response = await Supabase.instance.client
           .from('product_orders')
           .insert({
             'buyer_id': user.id,
-            'seller_id': sellerId,
+            'seller_id': finalSellerId,
             'product_id': productId,
             'amount': amount,
             'quantity': quantity,
@@ -1018,7 +1030,7 @@ class SupabaseService {
         final buyerName = buyerProfile?['full_name'] ?? buyerProfile?['pseudo'] ?? 'Un client';
 
         NotificationService.sendPushNotification(
-          recipientUserId: sellerId,
+          recipientUserId: finalSellerId,
           title: '🛍️ Nouvel achat !',
           body: '$buyerName vient d\'acheter votre produit ($totalAmount FCFA).',
           data: {'type': 'order', 'orderId': response['id']},
@@ -1374,9 +1386,22 @@ class SupabaseService {
       final user = getCurrentUser();
       if (user == null) throw Exception('User not authenticated');
 
+      // Resolve real owner_id directly from products table if missing/null to guarantee receipt
+      String finalOwnerId = ownerId;
+      if (finalOwnerId.isEmpty || finalOwnerId == 'null') {
+        try {
+          final prodData = await Supabase.instance.client
+              .from('products')
+              .select('owner_id, user_id')
+              .eq('id', targetProductId)
+              .maybeSingle();
+          finalOwnerId = prodData?['owner_id']?.toString() ?? prodData?['user_id']?.toString() ?? ownerId;
+        } catch (_) {}
+      }
+
       await Supabase.instance.client.from('exchanges').insert({
         'target_product_id': targetProductId,
-        'owner_id': ownerId,
+        'owner_id': finalOwnerId,
         'requester_id': user.id,
         'requester_product_id': requesterProductId,
         'message': message,
@@ -1395,7 +1420,7 @@ class SupabaseService {
         final requesterName = requesterProfile?['full_name'] ?? requesterProfile?['pseudo'] ?? 'Un utilisateur';
 
         NotificationService.sendPushNotification(
-          recipientUserId: ownerId,
+          recipientUserId: finalOwnerId,
           title: '🤝 Nouvelle proposition d\'échange !',
           body: '$requesterName vous propose un échange sur votre annonce.',
           data: {'type': 'exchange_proposal'},
