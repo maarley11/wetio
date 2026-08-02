@@ -159,6 +159,34 @@ class SupabaseService {
         'sender_id': user.id,
         'content': content,
       });
+
+      // Push notification to the other participant
+      try {
+        final conv = await Supabase.instance.client
+            .from('chat_conversations')
+            .select('participant_a, participant_b')
+            .eq('id', conversationId)
+            .maybeSingle();
+        if (conv != null) {
+          final recipientId = conv['participant_a'] == user.id
+              ? conv['participant_b'] as String
+              : conv['participant_a'] as String;
+          final senderProfile = await Supabase.instance.client
+              .from('user_profiles')
+              .select('full_name, pseudo')
+              .eq('id', user.id)
+              .maybeSingle();
+          final senderName = senderProfile?['full_name'] ?? senderProfile?['pseudo'] ?? 'Quelqu\'un';
+          NotificationService.sendPushNotification(
+            recipientUserId: recipientId,
+            title: '💬 Nouveau message de $senderName',
+            body: content.length > 80 ? '${content.substring(0, 80)}…' : content,
+            data: {'type': 'chat', 'conversationId': conversationId},
+          );
+        }
+      } catch (pushErr) {
+        print('Chat push error: $pushErr');
+      }
     } catch (e) {
       print('Error sending message: $e');
       throw e;
@@ -233,6 +261,34 @@ class SupabaseService {
         'exchange_type': 'wetio',
         'verification_pin': verificationPin,
       }).select('id').single();
+
+      // Push notification to delivery partner + person B
+      try {
+        final initiatorProfile = await Supabase.instance.client
+            .from('user_profiles')
+            .select('full_name, pseudo')
+            .eq('id', user.id)
+            .maybeSingle();
+        final initiatorName = initiatorProfile?['full_name'] ?? initiatorProfile?['pseudo'] ?? 'Quelqu\'un';
+        // Notify delivery partner
+        NotificationService.sendPushNotification(
+          recipientUserId: partnerUserId,
+          title: '🚚 Nouvelle demande de livraison !',
+          body: '$initiatorName a fait appel à vous pour une livraison d\'échange.',
+          data: {'type': 'delivery_request', 'deliveryId': response['id']},
+        );
+        // Notify person B (other exchange participant)
+        if (personBId != null && personBId.isNotEmpty) {
+          NotificationService.sendPushNotification(
+            recipientUserId: personBId.toString(),
+            title: '📦 Livraison de votre échange en cours !',
+            body: 'Un livreur a été mandaté pour votre échange. Restez disponible.',
+            data: {'type': 'delivery_request', 'deliveryId': response['id']},
+          );
+        }
+      } catch (pushErr) {
+        print('Delivery push error: $pushErr');
+      }
 
       return response['id'] as String;
     } catch (e) {
