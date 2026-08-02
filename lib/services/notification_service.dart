@@ -53,19 +53,29 @@ class NotificationService {
     if (recipientUserId.isEmpty) return;
 
     try {
+      const restApiKey = String.fromEnvironment('ONESIGNAL_REST_API_KEY', defaultValue: '');
+      final headers = <String, String>{
+        'Content-Type': 'application/json; charset=utf-8',
+      };
+      if (restApiKey.isNotEmpty) {
+        headers['Authorization'] = 'Basic $restApiKey';
+      }
+
       final response = await http.post(
         Uri.parse('https://onesignal.com/api/v1/notifications'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-        },
+        headers: headers,
         body: jsonEncode({
           'app_id': _oneSignalAppId,
+          'include_external_user_ids': [recipientUserId],
           'include_aliases': {
             'external_id': [recipientUserId],
           },
           'target_channel': 'push',
           'headings': {'fr': title, 'en': title},
           'contents': {'fr': body, 'en': body},
+          'ios_sound': 'default',
+          'ios_badgeType': 'Increase',
+          'ios_badgeCount': 1,
           'data': data ?? {},
         }),
       );
