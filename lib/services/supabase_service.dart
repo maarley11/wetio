@@ -508,13 +508,13 @@ class SupabaseService {
           String pushTitle = '';
           String pushBody = '';
 
-          if (status == 'acceptee') {
+          if (status == 'acceptee' || status == 'accepted') {
             pushTitle = '🚚 Livreur attribué !';
             pushBody = '$courierName a accepté de prendre en charge votre livraison. Il est en route !';
-          } else if (status == 'recuperee') {
+          } else if (status == 'recuperee' || status == 'recupere') {
             pushTitle = '📦 Colis récupéré !';
             pushBody = '$courierName a récupéré le colis. Il se dirige vers l\'adresse de livraison.';
-          } else if (status == 'terminee') {
+          } else if (status == 'terminee' || status == 'completed') {
             pushTitle = '🎉 Livraison terminée !';
             pushBody = 'Votre livraison a été validée avec succès. Kaywetio vous remercie pour votre confiance ! À très vite pour un nouvel échange ! 🤝';
           }
