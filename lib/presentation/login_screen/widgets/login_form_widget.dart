@@ -311,20 +311,22 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
 
           SizedBox(height: 17.0),
 
-          // Identifier Field (phone or email)
+          // Identifier Field (phone or email or pseudo)
           TextFormField(
             controller: _identifierController,
             keyboardType:
-                _useEmail ? TextInputType.emailAddress : TextInputType.phone,
+                _useEmail ? TextInputType.emailAddress : TextInputType.text,
             textInputAction: TextInputAction.next,
+            autocorrect: false,
+            enableSuggestions: false,
             enabled: !widget.isLoading,
             style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 color: colorScheme.onSurface),
             decoration: InputDecoration(
-              labelText: _useEmail ? 'Email ou identifiant' : 'Téléphone ou identifiant',
-              hintText: _useEmail ? 'exemple@email.com ou ngary11' : '77 123 45 67 ou ngary11',
+              labelText: _useEmail ? 'Adresse email' : 'Téléphone ou identifiant',
+              hintText: _useEmail ? 'exemple@email.com' : '77 123 45 67',
               prefixIcon: Padding(
                 padding: EdgeInsets.all(12.0),
                 child: Icon(
