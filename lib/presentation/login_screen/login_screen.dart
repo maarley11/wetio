@@ -8,7 +8,6 @@ import '../../services/app_language_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
 import './widgets/login_form_widget.dart';
-import './widgets/social_login_widget.dart';
 import './widgets/wetio_logo_widget.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -312,50 +311,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showProviderPendingDialog(String providerName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.info_outline, color: AppTheme.primaryGreen, size: 28),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Connexion $providerName',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'L\'authentification par $providerName nécessite la configuration des identifiants OAuth ($providerName Cloud / Apple Developer) sur la console Supabase.\n\n'
-          'Veuillez utiliser votre numéro de téléphone ou votre adresse email pour vous connecter.',
-          style: GoogleFonts.inter(fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text('Compris', style: GoogleFonts.inter(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleGoogleLogin() {
-    _showProviderPendingDialog('Google');
-  }
-
-  void _handleAppleLogin() {
-    _showProviderPendingDialog('Apple');
-  }
-
   void _navigateToSignUp() {
     HapticFeedback.lightImpact();
     Navigator.pushNamed(context, AppRoutes.registrationScreen);
@@ -469,15 +424,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Login Form
                     LoginFormWidget(
                       onLogin: _handleLogin,
-                      isLoading: _isLoading,
-                    ),
-
-                    SizedBox(height: 34.0),
-
-                    // Social Login Options
-                    SocialLoginWidget(
-                      onGoogleLogin: _handleGoogleLogin,
-                      onAppleLogin: _handleAppleLogin,
                       isLoading: _isLoading,
                     ),
 

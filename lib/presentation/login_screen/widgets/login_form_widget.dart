@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
 import '../../../services/supabase_service.dart';
@@ -47,16 +46,8 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text.trim();
 
-    bool identifierValid;
-    if (_useEmail) {
-      identifierValid =
-          RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(identifier);
-    } else {
-      final cleaned = identifier.replaceAll(RegExp(r'[\s\-\.\(\)\+]'), '');
-      identifierValid = cleaned.length >= 7 &&
-          cleaned.length <= 15 &&
-          RegExp(r'^[0-9]+$').hasMatch(cleaned);
-    }
+    // Valid if identifier is at least 3 chars (supports pseudo, email, or phone)
+    final identifierValid = identifier.length >= 3;
 
     final isValid =
         identifierValid && password.isNotEmpty && password.length >= 6;
@@ -69,22 +60,11 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
   }
 
   String? _validateIdentifier(String? value) {
-    if (value == null || value.isEmpty) {
-      return _useEmail
-          ? 'Veuillez saisir votre adresse email'
-          : 'Veuillez saisir votre numéro de téléphone';
+    if (value == null || value.trim().isEmpty) {
+      return 'Veuillez saisir votre identifiant, email ou numéro';
     }
-    if (_useEmail) {
-      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-        return 'Adresse email invalide';
-      }
-    } else {
-      final cleaned = value.trim().replaceAll(RegExp(r'[\s\-\.\(\)\+]'), '');
-      if (cleaned.length < 7 ||
-          cleaned.length > 15 ||
-          !RegExp(r'^[0-9]+$').hasMatch(cleaned)) {
-        return 'Numéro invalide (7 à 15 chiffres)';
-      }
+    if (value.trim().length < 3) {
+      return 'L\'identifiant doit contenir au moins 3 caractères';
     }
     return null;
   }
@@ -343,8 +323,8 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                 fontWeight: FontWeight.w400,
                 color: colorScheme.onSurface),
             decoration: InputDecoration(
-              labelText: _useEmail ? 'Adresse email' : 'Numéro de téléphone',
-              hintText: _useEmail ? 'exemple@email.com' : '77 123 45 67',
+              labelText: _useEmail ? 'Email ou identifiant' : 'Téléphone ou identifiant',
+              hintText: _useEmail ? 'exemple@email.com ou ngary11' : '77 123 45 67 ou ngary11',
               prefixIcon: Padding(
                 padding: EdgeInsets.all(12.0),
                 child: Icon(

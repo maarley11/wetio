@@ -9,7 +9,6 @@ import '../login_screen/widgets/wetio_logo_widget.dart';
 import './widgets/location_section_widget.dart';
 import './widgets/profile_photo_section_widget.dart';
 import './widgets/registration_form_widget.dart';
-import './widgets/social_registration_widget.dart';
 import './widgets/terms_agreement_widget.dart';
 
 class RegistrationScreen extends StatefulWidget {
@@ -536,74 +535,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  void _showProviderPendingDialog(String providerName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.info_outline, color: AppTheme.primaryGreen, size: 28),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Inscription $providerName',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'L\'inscription par $providerName nécessite la configuration des identifiants OAuth ($providerName Cloud / Apple Developer) sur la console Supabase.\n\n'
-          'Veuillez utiliser votre numéro de téléphone ou votre adresse email pour vous inscrire.',
-          style: GoogleFonts.inter(fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text('Compris', style: GoogleFonts.inter(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleGoogleSignUp() {
-    _showProviderPendingDialog('Google');
-  }
-
-  void _handleAppleSignUp() {
-    _showProviderPendingDialog('Apple');
-  }
-
-  void _handleFacebookSignUp() {
-    _showComingSoonMessage('Facebook');
-  }
-
-  void _showComingSoonMessage(String platform) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Inscription $platform bientôt disponible',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        backgroundColor: colorScheme.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   void _onPhotoSelected(String imagePath) {
     setState(() {
       _profileImagePath = imagePath;
@@ -731,15 +662,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   isLoading: _isLoading,
                   onRegister: _handleRegistrationWrapper,
                   isFormValid: _isFormValid,
-                ),
-
-                SizedBox(height: 34.0),
-
-                // Social Registration
-                SocialRegistrationWidget(
-                  onGoogleSignUp: _handleGoogleSignUp,
-                  onAppleSignUp: _handleAppleSignUp,
-                  isLoading: _isLoading,
                 ),
 
                 SizedBox(height: 34.0),

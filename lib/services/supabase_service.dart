@@ -709,16 +709,16 @@ class SupabaseService {
     }
   }
 
-  /// Custom sign in that works with email OR phone number
+  /// Custom sign in that works with email, phone number, or pseudo/username
   static Future<AuthResponse> signInWithEmailOrPhone({
-    required String identifier, // Can be email or phone
+    required String identifier, // Can be email, phone, or pseudo
     required String password,
   }) async {
     try {
       // Clean the identifier first
       final cleanIdentifier = identifier.trim().toLowerCase();
 
-      // Check if identifier looks like an email
+      // Check if identifier looks like a full email
       final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 
       if (emailRegex.hasMatch(cleanIdentifier)) {
@@ -732,7 +732,6 @@ class SupabaseService {
           );
         } catch (e) {
           // If email not confirmed, try direct signInWithPassword which may work
-          // depending on Supabase project settings
           if (e.toString().contains('Email not confirmed') ||
               e.toString().contains('email_not_confirmed')) {
             try {
@@ -753,21 +752,33 @@ class SupabaseService {
           rethrow;
         }
       } else {
-        // It's a phone number - normalize and find the user profile first
+        // It's a phone number or pseudo (username) - search user_profiles first
         String normalizedPhone = _normalizePhoneNumber(cleanIdentifier);
-        print('📱 Tentative de connexion avec téléphone: $normalizedPhone');
+        print('📱 Tentative de connexion avec identifiant/téléphone/pseudo: $cleanIdentifier (tel: $normalizedPhone)');
 
         try {
-          // Try to find user profile with this phone number
-          final userQueryResult = await Supabase.instance.client
-              .from('user_profiles')
-              .select('email, id, full_name, is_active, phone')
-              .eq('phone', normalizedPhone)
-              .maybeSingle();
+          // Try to find user profile with this pseudo, phone, or email prefix
+          Map<String, dynamic>? userQuery;
 
-          Map<String, dynamic>? userQuery = userQueryResult;
+          try {
+            final userProfiles = await Supabase.instance.client
+                .from('user_profiles')
+                .select('email, id, full_name, is_active, phone, pseudo')
+                .or('pseudo.ilike.%$cleanIdentifier%,phone.ilike.%$cleanIdentifier%,phone.eq.$normalizedPhone,email.ilike.%$cleanIdentifier%');
 
-          // If not found with normalized phone, try alternative formats
+            if (userProfiles.isNotEmpty) {
+              final list = List<Map<String, dynamic>>.from(userProfiles);
+              userQuery = list.firstWhere(
+                (p) => (p['pseudo']?.toString().toLowerCase() == cleanIdentifier) ||
+                       (p['phone']?.toString().replaceAll(RegExp(r'\D'), '') == cleanIdentifier.replaceAll(RegExp(r'\D'), '')),
+                orElse: () => list.first,
+              );
+            }
+          } catch (profileErr) {
+            print('⚠️ Profil query warning: $profileErr');
+          }
+
+          // If not found with OR filter, try alternative phone formats
           if (userQuery == null) {
             final alternativeFormats = _getAlternativePhoneFormats(
               cleanIdentifier,
@@ -776,7 +787,7 @@ class SupabaseService {
               if (format == normalizedPhone) continue;
               final altResult = await Supabase.instance.client
                   .from('user_profiles')
-                  .select('email, id, full_name, is_active, phone')
+                  .select('email, id, full_name, is_active, phone, pseudo')
                   .eq('phone', format)
                   .maybeSingle();
               if (altResult != null) {
@@ -787,9 +798,18 @@ class SupabaseService {
           }
 
           if (userQuery == null) {
+            // As fallback, try signing in with generated phone email
+            final cleanDigits = cleanIdentifier.replaceAll(RegExp(r'\D'), '');
+            if (cleanDigits.isNotEmpty) {
+              final fallbackEmail = 'phone_${cleanDigits}@wetio.app';
+              try {
+                return await signInWithEmail(email: fallbackEmail, password: password);
+              } catch (_) {}
+            }
+
             throw Exception(
-              'PHONE_NOT_FOUND: Aucun compte trouvé avec ce numéro de téléphone. '
-              'Vérifiez votre numéro ou créez un nouveau compte.',
+              'PHONE_NOT_FOUND: Aucun compte trouvé avec cet identifiant ou numéro de téléphone. '
+              'Vérifiez vos identifiants ou créez un nouveau compte.',
             );
           }
 
@@ -823,7 +843,7 @@ class SupabaseService {
           }
 
           print(
-            '✅ Utilisateur trouvé: ${userQuery['full_name']} ($userEmail)',
+            '✅ Utilisateur trouvé: ${userQuery['full_name']} / ${userQuery['pseudo']} ($userEmail)',
           );
 
           // Try to sign in with the found email
@@ -881,7 +901,7 @@ class SupabaseService {
       // Handle Supabase auth errors
       if (errStr.contains('invalid login credentials') || errStr.contains('invalid_credentials')) {
         throw Exception(
-          'INVALID_CREDENTIALS: Email/téléphone ou mot de passe incorrect. '
+          'INVALID_CREDENTIALS: Email/téléphone/pseudo ou mot de passe incorrect. '
           'Vérifiez vos identifiants.',
         );
       } else if (errStr.contains('email not confirmed') ||
@@ -901,36 +921,6 @@ class SupabaseService {
           'Si le problème persiste, contactez le support.',
         );
       }
-    }
-  }
-
-  /// Sign in with Google OAuth
-  static Future<void> signInWithGoogle() async {
-    try {
-      final redirectTo = kIsWeb 
-          ? html.window.location.origin 
-          : 'com.wetio.app.testProject.V8A4F7BK95://login-callback';
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: redirectTo,
-      );
-    } catch (e) {
-      throw Exception('Google sign-in failed: $e');
-    }
-  }
-
-  /// Sign in with Apple OAuth
-  static Future<void> signInWithApple() async {
-    try {
-      final redirectTo = kIsWeb 
-          ? html.window.location.origin 
-          : 'com.wetio.app.testProject.V8A4F7BK95://login-callback';
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.apple,
-        redirectTo: redirectTo,
-      );
-    } catch (e) {
-      throw Exception('Apple sign-in failed: $e');
     }
   }
 
