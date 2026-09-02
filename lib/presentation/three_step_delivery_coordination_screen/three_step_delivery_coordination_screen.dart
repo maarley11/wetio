@@ -261,7 +261,7 @@ class _ThreeStepDeliveryCoordinationScreenState
               NotificationService.sendPushNotification(
                 recipientUserId: uid,
                 title: '🎉 Livraison terminée !',
-                body: 'Le double échange a été réalisé avec succès ! Kaywetio vous remercie pour votre confiance. À très vite ! 🤝',
+                body: 'Le double échange a été réalisé avec succès ! WETIO vous remercie pour votre confiance. À très vite ! 🤝',
                 data: {'type': 'delivery_status', 'deliveryId': _deliveryRequestId!, 'status': 'completed'},
               );
             }

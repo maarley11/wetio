@@ -516,7 +516,7 @@ class SupabaseService {
             pushBody = '$courierName a récupéré le colis. Il se dirige vers l\'adresse de livraison.';
           } else if (status == 'terminee' || status == 'completed') {
             pushTitle = '🎉 Livraison terminée !';
-            pushBody = 'Votre livraison a été validée avec succès. Kaywetio vous remercie pour votre confiance ! À très vite pour un nouvel échange ! 🤝';
+            pushBody = 'Votre livraison a été validée avec succès. WETIO vous remercie pour votre confiance ! À très vite pour un nouvel échange ! 🤝';
           }
 
           if (pushTitle.isNotEmpty) {
@@ -705,7 +705,7 @@ class SupabaseService {
       return 'Un SMS de réinitialisation a été envoyé au numéro $phoneE164.';
     } catch (e) {
       print('SMS Provider notice: $e');
-      return 'L\'envoi automatique de SMS par réseau mobile nécessite la clé d\'accès opérateur (Twilio / SMS Gateway) sur Supabase. Veuillez réinitialiser par Email ou contacter le support Kaywetio.';
+      return 'L\'envoi automatique de SMS par réseau mobile nécessite la clé d\'accès opérateur (Twilio / SMS Gateway) sur Supabase. Veuillez réinitialiser par Email ou contacter le support WETIO.';
     }
   }
 
@@ -1339,7 +1339,7 @@ class SupabaseService {
               'type': 'delivery_status_update',
               'category': 'Livraisons',
               'title': "LIVRAISON TERMINÉE !",
-              'message': "Votre livraison a été validée avec succès. Kaywetio vous remercie pour votre confiance ! À très vite pour un nouvel échange ! 🤝",
+              'message': "Votre livraison a été validée avec succès. WETIO vous remercie pour votre confiance ! À très vite pour un nouvel échange ! 🤝",
               'timestamp': baseTimestamp.toIso8601String(),
               'isRead': false,
               'accentColor': AppTheme.successGreen,
