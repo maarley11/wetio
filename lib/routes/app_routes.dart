@@ -38,6 +38,7 @@ import '../presentation/ad_banner_scheduling/ad_banner_scheduling_screen.dart';
 import '../presentation/ad_banner_analytics/ad_banner_analytics_dashboard.dart';
 import '../presentation/product_purchase_screen/product_purchase_screen.dart';
 import '../presentation/payout_methods_screen/payout_methods_screen.dart';
+import '../presentation/splash_screen/splash_screen.dart';
 
 class AppRoutes {
   static const String splashScreen = '/splash_screen';
@@ -100,6 +101,7 @@ class AppRoutes {
   static const String payoutMethods = '/payout-methods';
 
   static Map<String, WidgetBuilder> get routes => {
+        splashScreen: (context) => const SplashScreen(),
         loginScreen: (context) => const LoginScreen(),
         registrationScreen: (context) => const RegistrationScreen(),
         termsOfServiceScreen: (context) => const TermsOfServiceScreen(),

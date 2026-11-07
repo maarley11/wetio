@@ -243,6 +243,7 @@ class _MobileBottomBar extends StatelessWidget {
 
               return Expanded(
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () {
                     HapticFeedback.lightImpact();
                     if (item.requiresAuth) {

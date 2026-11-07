@@ -145,6 +145,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
 
               return Expanded(
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => _onItemTapped(index, item.route),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),

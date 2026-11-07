@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../widgets/auth_guard.dart';
 import '../exchange_proposal/widgets/target_product_card.dart';
 
 class ProductDetail extends StatefulWidget {
@@ -289,11 +290,13 @@ class _ProductDetailState extends State<ProductDetail> {
           Expanded(
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  AppRoutes.exchangeProposal,
-                  arguments: _productData,
-                );
+                requireAuth(context, () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.exchangeProposal,
+                    arguments: _productData,
+                  );
+                });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryOrange.withOpacity(0.1),
@@ -323,11 +326,13 @@ class _ProductDetailState extends State<ProductDetail> {
           Expanded(
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  AppRoutes.productPurchase,
-                  arguments: _productData,
-                );
+                requireAuth(context, () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.productPurchase,
+                    arguments: _productData,
+                  );
+                });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryGreen,

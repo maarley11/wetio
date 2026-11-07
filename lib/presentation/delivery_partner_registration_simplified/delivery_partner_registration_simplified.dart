@@ -275,8 +275,8 @@ class _DeliveryPartnerRegistrationSimplifiedState
                     _buildStepLabel(
                       context,
                       2,
-                      'Paiement',
-                      Icons.payment_outlined,
+                      'Activation',
+                      Icons.verified_outlined,
                     ),
                   ],
                 ),

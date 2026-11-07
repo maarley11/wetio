@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../core/prebuilt_thumbs.dart';
 
 class CustomImageWidget extends StatelessWidget {
   final String? imageUrl;
@@ -20,17 +22,60 @@ class CustomImageWidget extends StatelessWidget {
     this.errorWidget,
   }) : super(key: key);
 
+  static String resolveOptimizedUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.isEmpty) {
+      return 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=600&auto=format&fit=crop';
+    }
+    final trimmed = rawUrl.trim();
+    final thumbRel = kPrebuiltThumbMap[trimmed];
+    if (thumbRel != null) {
+      return kIsWeb ? thumbRel : 'https://www.kaywetio.com/$thumbRel';
+    }
+    return trimmed;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final resolvedUrl = resolveOptimizedUrl(imageUrl);
+
+    if (kIsWeb) {
+      return Image.network(
+        resolvedUrl,
+        width: width,
+        height: height,
+        fit: fit,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.low,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return Container(
+            width: width,
+            height: height,
+            color: const Color(0xFFF1F3F2),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) =>
+            errorWidget ??
+            Image.asset(
+              "assets/images/no-image.jpg",
+              fit: fit,
+              width: width,
+              height: height,
+            ),
+      );
+    }
+
     return CachedNetworkImage(
-      imageUrl: imageUrl ??
-          'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop',
+      imageUrl: resolvedUrl,
       width: width,
       height: height,
       fit: fit,
       alignment: Alignment.center,
-
-      // Use caller-supplied widget if provided, else fallback asset.
+      fadeInDuration: const Duration(milliseconds: 60),
+      fadeOutDuration: Duration.zero,
+      memCacheWidth: 480,
       errorWidget: (context, url, error) =>
           errorWidget ??
           Image.asset(
@@ -39,12 +84,10 @@ class CustomImageWidget extends StatelessWidget {
             width: width,
             height: height,
           ),
-
       placeholder: (context, url) => Container(
         width: width,
         height: height,
-        color: Colors.grey[200],
-        child: const Center(child: CircularProgressIndicator()),
+        color: const Color(0xFFF1F3F2),
       ),
     );
   }

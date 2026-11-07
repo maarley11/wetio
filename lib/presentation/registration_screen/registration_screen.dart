@@ -54,7 +54,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         hasIdentifier &&
         _passwordController.text.isNotEmpty &&
         _confirmPasswordController.text.isNotEmpty &&
-        _passwordController.text.length >= 6;
+        _passwordController.text.length >= 8;
 
     if (_isFormValid != isValid) {
       setState(() {

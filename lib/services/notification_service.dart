@@ -8,8 +8,7 @@ import 'supabase_service.dart';
 
 class NotificationService {
   static const String _oneSignalAppId = '413a0a67-f737-42ec-ab09-8a91dea50089';
-  static String get _defaultRestApiKey => utf8.decode(base64.decode(
-      'b3NfdjJfYXBwX2llNWF1ejd4ZzVib3preWpya2k1NWppYXJmNHZqaWNpcmZsZWdudXVwd3ZoM3dqbHlwd3k0MnhvbDZxeDZ2cmNqYmwyZ3BsN21icXludTN5Z2NlMmw1bzJ5MzQ3YnFxNGtwaTd1aHk='));
+  static const String _defaultRestApiKey = String.fromEnvironment('ONESIGNAL_REST_API_KEY', defaultValue: '');
 
   static GlobalKey<NavigatorState>? navigatorKey;
 
@@ -108,6 +107,7 @@ class NotificationService {
     try {
       const envApiKey = String.fromEnvironment('ONESIGNAL_REST_API_KEY', defaultValue: '');
       final restApiKey = envApiKey.isNotEmpty ? envApiKey : _defaultRestApiKey;
+      if (restApiKey.isEmpty) return;
       final authHeader = restApiKey.startsWith('os_v2_app_')
           ? 'Key $restApiKey'
           : 'Basic $restApiKey';

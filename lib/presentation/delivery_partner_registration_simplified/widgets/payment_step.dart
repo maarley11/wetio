@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:sizer/sizer.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/supabase_service.dart';
 import '../../../core/app_export.dart';
@@ -22,17 +20,9 @@ class PaymentStep extends StatefulWidget {
 }
 
 class _PaymentStepState extends State<PaymentStep> {
-  String _selectedPaymentMethod = 'wave';
   bool _isProcessing = false;
 
-  void _processPayment() async {
-    if (_selectedPaymentMethod != 'wave') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez utiliser Wave pour le moment.")),
-      );
-      return;
-    }
-
+  void _activateFreeAccount() async {
     setState(() {
       _isProcessing = true;
     });
@@ -40,36 +30,16 @@ class _PaymentStepState extends State<PaymentStep> {
     HapticFeedback.mediumImpact();
 
     try {
-      // 1. Launch Official Wave Checkout Link
-      final waveUrl = 'https://pay.wave.com/m/M_sn_F7IKNV0jou_P/c/sn/';
-      final uri = Uri.parse(waveUrl);
+      final success = await SupabaseService.registerAsDeliveryPartner();
 
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        
-        // Show confirmation that we're waiting for payment
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Redirection vers Wave... Validez le paiement pour activer votre compte."),
-              backgroundColor: AppTheme.primaryGreen,
-            ),
-          );
-        }
-
-        // 2. Register as delivery partner in database (simulate activation)
-        // In a real production app, this would be handled by a Wave webhook.
-        final success = await SupabaseService.registerAsDeliveryPartner();
-
-        if (success && mounted) {
-          widget.onComplete();
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Erreur lors de l'activation du compte livreur.")),
-          );
-        }
-      } else {
-        throw Exception("Impossible d'ouvrir le lien Wave.");
+      if (success && mounted) {
+        widget.onComplete();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Erreur lors de l'activation du compte livreur."),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -94,32 +64,32 @@ class _PaymentStepState extends State<PaymentStep> {
     return Container(
       color: colorScheme.surface,
       child: Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
             Text(
-              'Paiement',
+              'Inscription Gratuite',
               style: GoogleFonts.inter(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.textPrimary,
               ),
             ),
-            SizedBox(height: 8.5),
+            const SizedBox(height: 8.5),
             Text(
-              'Payez 2000 FCFA pour 1 mois d\'accès au service de livraison.',
+              'L\'abonnement au service de livraison WETIO est désormais 100% gratuit. Aucun paiement n\'est requis.',
               style: GoogleFonts.inter(
                 fontSize: 16,
                 color: AppTheme.textSecondary,
               ),
             ),
-            SizedBox(height: 34.0),
+            const SizedBox(height: 34.0),
 
-            // Payment Amount
+            // Free Amount Box
             Container(
-              padding: EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
                 color: AppTheme.primaryGreen.withAlpha(26),
                 borderRadius: BorderRadius.circular(12),
@@ -136,9 +106,9 @@ class _PaymentStepState extends State<PaymentStep> {
                     ),
                   ),
                   Text(
-                    '2000 FCFA',
+                    'GRATUIT (0 FCFA)',
                     style: GoogleFonts.inter(
-                      fontSize: 24,
+                      fontSize: 20,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.primaryGreen,
                     ),
@@ -146,44 +116,80 @@ class _PaymentStepState extends State<PaymentStep> {
                 ],
               ),
             ),
-            SizedBox(height: 34.0),
+            const SizedBox(height: 28.0),
 
-            // Payment Methods
-            Text(
-              'Méthode de paiement',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            SizedBox(height: 17.0),
-
+            // Free Access Card
             Expanded(
               child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildPaymentMethodCard(
-                      method: 'wave',
-                      title: 'Wave',
-                      description: 'Paiement mobile Wave',
-                      icon: 'account_balance_wallet',
+                child: Container(
+                  padding: const EdgeInsets.all(20.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppTheme.primaryGreen,
+                      width: 2,
                     ),
-                    SizedBox(height: 17.0),
-                    _buildPaymentMethodCard(
-                      method: 'orange_money',
-                      title: 'Orange Money',
-                      description: 'Paiement mobile Orange',
-                      icon: 'payment',
-                    ),
-                    SizedBox(height: 17.0),
-                    _buildPaymentMethodCard(
-                      method: 'free_money',
-                      title: 'Free Money',
-                      description: 'Paiement mobile Free',
-                      icon: 'account_balance',
-                    ),
-                  ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withAlpha(26),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.verified_outlined,
+                              size: 28,
+                              color: AppTheme.primaryGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 16.0),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Abonnement 100% Gratuit',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4.0),
+                                Text(
+                                  'Accès immédiat sans frais d\'inscription',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.check_circle,
+                            color: AppTheme.primaryGreen,
+                            size: 24,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16.0),
+                      Text(
+                        'Cliquez sur « Activer gratuitement » ci-dessous pour activer immédiatement votre profil livreur et recevoir les demandes de livraison autour de vous.',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -200,7 +206,7 @@ class _PaymentStepState extends State<PaymentStep> {
                             widget.onPrevious();
                           },
                     style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 17.0),
+                      padding: const EdgeInsets.symmetric(vertical: 17.0),
                       side: BorderSide(
                         color: _isProcessing
                             ? colorScheme.outline.withAlpha(77)
@@ -222,21 +228,21 @@ class _PaymentStepState extends State<PaymentStep> {
                     ),
                   ),
                 ),
-                SizedBox(width: 16.0),
+                const SizedBox(width: 16.0),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _isProcessing ? null : _processPayment,
+                    onPressed: _isProcessing ? null : _activateFreeAccount,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _isProcessing
                           ? colorScheme.outline.withAlpha(77)
                           : AppTheme.primaryGreen,
-                      padding: EdgeInsets.symmetric(vertical: 17.0),
+                      padding: const EdgeInsets.symmetric(vertical: 17.0),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: _isProcessing
-                        ? SizedBox(
+                        ? const SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
@@ -247,10 +253,10 @@ class _PaymentStepState extends State<PaymentStep> {
                             ),
                           )
                         : Text(
-                            'Payer',
+                            'Activer gratuitement',
                             style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
                               color: Colors.white,
                             ),
                           ),
@@ -258,85 +264,6 @@ class _PaymentStepState extends State<PaymentStep> {
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodCard({
-    required String method,
-    required String title,
-    required String description,
-    required String icon,
-  }) {
-    final isSelected = _selectedPaymentMethod == method;
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        setState(() {
-          _selectedPaymentMethod = method;
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color:
-                isSelected ? AppTheme.primaryGreen : Colors.grey.withAlpha(51),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(12.0),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppTheme.primaryGreen.withAlpha(26)
-                    : Colors.grey.withAlpha(26),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CustomIconWidget(
-                iconName: icon,
-                size: 32,
-                color:
-                    isSelected ? AppTheme.primaryGreen : AppTheme.textSecondary,
-              ),
-            ),
-            SizedBox(width: 16.0),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 4.3),
-                  Text(
-                    description,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              CustomIconWidget(
-                iconName: 'check_circle',
-                size: 24,
-                color: AppTheme.primaryGreen,
-              ),
           ],
         ),
       ),

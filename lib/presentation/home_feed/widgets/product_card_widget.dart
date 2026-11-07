@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../widgets/auth_guard.dart';
 
 
 class ProductCardWidget extends StatefulWidget {
@@ -410,7 +411,17 @@ class _ProductCardWidgetState extends State<ProductCardWidget> {
                       child: ElevatedButton(
                         onPressed: () {
                           HapticFeedback.lightImpact();
-                          widget.onPropose?.call();
+                          if (widget.onPropose != null) {
+                            widget.onPropose!();
+                          } else {
+                            requireAuth(context, () {
+                              Navigator.pushNamed(
+                                context,
+                                AppRoutes.exchangeProposal,
+                                arguments: widget.product,
+                              );
+                            });
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
@@ -462,11 +473,13 @@ class _ProductCardWidgetState extends State<ProductCardWidget> {
                           if (widget.onBuy != null) {
                             widget.onBuy!();
                           } else {
-                            Navigator.pushNamed(
-                              context,
-                              '/product-purchase',
-                              arguments: widget.product,
-                            );
+                            requireAuth(context, () {
+                              Navigator.pushNamed(
+                                context,
+                                '/product-purchase',
+                                arguments: widget.product,
+                              );
+                            });
                           }
                         },
                         style: ElevatedButton.styleFrom(

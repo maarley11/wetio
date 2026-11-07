@@ -168,13 +168,28 @@ class _DeliveryPartnerSearchState extends State<DeliveryPartnerSearch> {
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('delivery_persons')
-          .select('*, user_profiles(full_name, phone, avatar_url)')
+          .select('*')
           .eq('availability_status', 'available')
           .eq('status', 'approved');
 
       if (mounted && (response as List).isNotEmpty) {
+        final userIds = response
+            .map((dp) => dp['user_id']?.toString())
+            .where((id) => id != null && id.isNotEmpty)
+            .toSet()
+            .toList();
+        final Map<String, Map<String, dynamic>> profilesById = {};
+        if (userIds.isNotEmpty) {
+          final profilesResp = await supabase
+              .from('public_profiles')
+              .select('id, full_name, pseudo, avatar_url')
+              .inFilter('id', userIds);
+          for (final p in (profilesResp as List)) {
+            profilesById[p['id'].toString()] = Map<String, dynamic>.from(p as Map);
+          }
+        }
         final dbPartners = response.map((dp) {
-          final profile = dp['user_profiles'] as Map<String, dynamic>?;
+          final profile = profilesById[dp['user_id']?.toString()];
           return {
             'id': dp['id'],
             'dbId': dp['id'],

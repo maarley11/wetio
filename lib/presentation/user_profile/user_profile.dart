@@ -35,6 +35,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   final ImagePicker _imagePicker = ImagePicker();
   bool isLoading = true;
 
+  // Static memory cache for 0ms instant tab switching
+  static Map<String, dynamic> _cachedUserData = {};
+  static List<Map<String, dynamic>> _cachedAvailableProducts = [];
+  static List<Map<String, dynamic>> _cachedWantedProducts = [];
+  static String? _cachedUserId;
+
   // User data from Supabase
   Map<String, dynamic> _userData = {};
 
@@ -73,52 +79,69 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadProfileData();
+    final currentUserId = SupabaseService.getCurrentUser()?.id;
+    if (currentUserId != null &&
+        currentUserId == _cachedUserId &&
+        _cachedUserData.isNotEmpty) {
+      _userData = Map<String, dynamic>.from(_cachedUserData);
+      _availableProducts = List<Map<String, dynamic>>.from(_cachedAvailableProducts);
+      _wantedProducts = List<Map<String, dynamic>>.from(_cachedWantedProducts);
+      isLoading = false;
+      _loadProfileData(silent: true);
+    } else {
+      _loadProfileData();
+    }
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Reload profile data when returning from edit screen
-    _loadProfileData();
-  }
-
-  Future<void> _loadProfileData() async {
-    setState(() => isLoading = true);
+  Future<void> _loadProfileData({bool silent = false}) async {
+    if (!silent && _userData.isEmpty) {
+      setState(() => isLoading = true);
+    }
 
     try {
-      final profile = await SupabaseService.getCurrentUserProfile();
+      final currentUserId = SupabaseService.getCurrentUser()?.id;
+      if (currentUserId == null) {
+        if (mounted) setState(() => isLoading = false);
+        return;
+      }
+
+      // Fetch profile and user products in parallel instead of sequentially
+      final results = await Future.wait([
+        SupabaseService.getCurrentUserProfile(),
+        _loadUserProducts(currentUserId),
+      ]);
+      final profile = results[0] as Map<String, dynamic>?;
 
       if (profile != null && mounted) {
+        final newUserData = <String, dynamic>{
+          'id': profile['id'],
+          'name': profile['full_name'] ?? 'Utilisateur',
+          'location': profile['location'] ?? '',
+          'avatar': profile['avatar_url'],
+          'rating': (profile['rating'] != null) ? (profile['rating'] as num).toDouble() : 5.0,
+          'reviewCount': profile['review_count'] ?? 0,
+          'exchangeCount': profile['exchange_count'] ?? 0,
+          'memberSince': _formatYear(profile['created_at']),
+          'responseRate': 98,
+          'pseudo': profile['pseudo'] ?? '',
+          'phone': profile['phone'] ?? '',
+          'bio': profile['bio'] ?? '',
+          'payout_method': profile['payout_method'] ?? '',
+          'payout_phone': profile['payout_phone'] ?? '',
+          'is_delivery_partner': profile['is_delivery_partner'] ?? false,
+        };
+        _cachedUserId = currentUserId;
+        _cachedUserData = newUserData;
         setState(() {
-          _userData = {
-            'id': profile['id'],
-            'name': profile['full_name'] ?? 'Utilisateur',
-            'location': profile['location'] ?? '',
-            'avatar': profile['avatar_url'],
-            'rating': (profile['rating'] != null) ? (profile['rating'] as num).toDouble() : 5.0,
-            'reviewCount': profile['review_count'] ?? 0,
-            'exchangeCount': profile['exchange_count'] ?? 0,
-            'memberSince': _formatYear(profile['created_at']),
-            'responseRate': 98,
-            'pseudo': profile['pseudo'] ?? '',
-            'phone': profile['phone'] ?? '',
-            'bio': profile['bio'] ?? '',
-            'payout_method': profile['payout_method'] ?? '',
-            'payout_phone': profile['payout_phone'] ?? '',
-            'is_delivery_partner': profile['is_delivery_partner'] ?? false,
-          };
+          _userData = newUserData;
           isLoading = false;
         });
-        // Load products after profile
-        await _loadUserProducts(profile['id']);
-      } else {
+      } else if (mounted) {
         setState(() => isLoading = false);
       }
     } catch (e) {
       print('❌ Erreur lors du chargement du profil: $e');
-      setState(() => isLoading = false);
-      _showErrorSnackBar('Erreur lors du chargement du profil');
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -126,30 +149,27 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     try {
       final supabase = Supabase.instance.client;
 
-      // Load available products
-      print('📦 Loading products for user: $userId');
-      final availableResponse = await supabase
-          .from('products')
-          .select(
-            'id, title, category, images, location, product_condition, created_at, is_active, price, owner:user_profiles!owner_id(*)',
-          )
-          .eq('owner_id', userId)
-          .eq('product_type', 'disponible')
-          .eq('is_active', true)
-          .order('created_at', ascending: false);
-
-      print('📦 Found ${availableResponse.length} available products');
-
-      // Load wanted products
-      final wantedResponse = await supabase
-          .from('products')
-          .select('id, title, category, description, created_at')
-          .eq('owner_id', userId)
-          .eq('product_type', 'recherche')
-          .eq('is_active', true)
-          .order('created_at', ascending: false);
-      
-      print('📦 Found ${wantedResponse.length} wanted products');
+      // Load available and wanted products in parallel
+      final responses = await Future.wait([
+        supabase
+            .from('products')
+            .select(
+              'id, title, category, images, location, product_condition, created_at, is_active, price',
+            )
+            .eq('owner_id', userId)
+            .eq('product_type', 'disponible')
+            .eq('is_active', true)
+            .order('created_at', ascending: false),
+        supabase
+            .from('products')
+            .select('id, title, category, description, created_at')
+            .eq('owner_id', userId)
+            .eq('product_type', 'recherche')
+            .eq('is_active', true)
+            .order('created_at', ascending: false),
+      ]);
+      final availableResponse = responses[0];
+      final wantedResponse = responses[1];
 
       if (mounted) {
         setState(() {
@@ -172,6 +192,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 'userName': item['owner']?['full_name'] ?? item['owner']?['pseudo'] ?? 'Utilisateur',
               };
             }).toList();
+            _cachedAvailableProducts = _availableProducts;
           }
 
           if (wantedResponse is List) {
@@ -186,6 +207,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 'datePosted': _formatDate(item['created_at']),
               };
             }).toList();
+            _cachedWantedProducts = _wantedProducts;
           }
         });
       }

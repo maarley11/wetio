@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
+import '../../core/prebuilt_thumbs.dart';
 import '../../services/ad_banner_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
@@ -45,6 +48,12 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
     'demographic': 'Tous',
     'distance': 50.0,
   };
+
+  // Static in-memory cache for 0ms instant rendering
+  static List<Map<String, dynamic>> _cachedProducts = [];
+  static Set<String> _cachedFavoriteIds = {};
+  static int _cachedNotificationCount = 0;
+  static const String _prefsCacheKey = 'wetio_home_feed_cache_v2';
 
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _filteredProducts = [];
@@ -120,22 +129,54 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
   }
 
   void _initializeData() {
-    setState(() {
-      _isLoading = true;
-    });
+    // 1. Instant 0ms render from memory cache or embedded seed
+    if (_cachedProducts.isEmpty) {
+      _cachedProducts = getInitialSeedProducts();
+    }
+    _products = List<Map<String, dynamic>>.from(_cachedProducts);
+    _supabaseProducts = List<Map<String, dynamic>>.from(_cachedProducts);
+    _filteredProducts = List<Map<String, dynamic>>.from(_cachedProducts);
+    _favoriteProductIds = Set<String>.from(_cachedFavoriteIds);
+    _notificationCount = _cachedNotificationCount;
+    _isLoading = _products.isEmpty;
 
     final user = SupabaseService.getCurrentUser();
     if (user != null) {
       NotificationService.bindUser(user.id);
     }
 
+    // 2. Load persisted local cache + refresh from Supabase in background
+    _loadPersistedCache();
     _loadProductsFromSupabase();
     _loadUnreadNotificationCount();
+  }
+
+  Future<void> _loadPersistedCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefsCacheKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as List<dynamic>;
+        final cached = decoded
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        if (cached.isNotEmpty && mounted && _supabaseOffset == 0) {
+          _cachedProducts = cached;
+          setState(() {
+            _products = cached;
+            _supabaseProducts = cached;
+            _applyFilters();
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUnreadNotificationCount() async {
     try {
       final count = await SupabaseService.getUnreadNotificationCount();
+      _cachedNotificationCount = count;
       if (mounted) {
         setState(() {
           _notificationCount = count;
@@ -147,6 +188,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
   Future<void> _loadFavoriteIds() async {
     try {
       final ids = await SupabaseService.getFavoriteProductIds();
+      _cachedFavoriteIds = ids;
       if (mounted) {
         setState(() {
           _favoriteProductIds = ids;
@@ -202,7 +244,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
 
       final response = await supabase
           .from('products')
-          .select('*, owner:user_profiles!owner_id(*)')
+          .select('*')
           .order('created_at', ascending: false)
           .range(_supabaseOffset, _supabaseOffset + 19);
 
@@ -213,6 +255,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
           _hasMoreSupabaseProducts = false;
         }
         _supabaseOffset += data.length;
+
         final titlesToRemove = [
           'Robe été fleurie',
           'Livre de cuisine végétarienne',
@@ -224,36 +267,52 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
           'Savon et gel intime+parfums de classe'
         ];
 
-        final List<Map<String, dynamic>> dbProducts = data
-            .where((item) => !titlesToRemove.contains(item['title']))
-            .map((item) {
-          final Map<String, dynamic> productMap =
-              Map<String, dynamic>.from(item as Map);
-          final images = productMap['images'] as List?;
-          final ownerData = productMap['owner'] as Map<String, dynamic>?;
+        // Preserve any already-known owner profiles from memory cache
+        final Map<String, Map<String, dynamic>> profilesMap = {};
+        for (final existing in _cachedProducts) {
+          final oid = existing['owner_id']?.toString();
+          final own = existing['owner'];
+          if (oid != null && own is Map) {
+            profilesMap[oid] = Map<String, dynamic>.from(own);
+          }
+        }
 
-          return {
-            'id': productMap['id'],
-            'title': productMap['title'] ?? 'Sans titre',
-            'description': productMap['description'] ?? '',
-            'category': productMap['category'] ?? 'Autres',
-            'image': (images != null && images.isNotEmpty) ? images[0] : null,
-            'images': images,
-            'location': productMap['location'] ?? 'Sénégal',
-            'price': item['price'] ??
-                item['Price'] ??
-                item['amount'] ??
-                item['montant'],
-            'ownerId': productMap['owner_id'],
-            'owner_id': productMap['owner_id'],
-            'owner': ownerData,
-            'condition': productMap['product_condition'],
-            'type': productMap['product_type'],
-            'demographic': 'Tous',
-            'userName': ownerData?['full_name'] ?? ownerData?['pseudo'] ?? 'Utilisateur',
-            'distance': '~2 km',
-          };
-        }).toList();
+        List<Map<String, dynamic>> mapProductsWithProfiles() {
+          return data
+              .where((item) => !titlesToRemove.contains(item['title']))
+              .map((item) {
+            final Map<String, dynamic> productMap =
+                Map<String, dynamic>.from(item as Map);
+            final images = productMap['images'] as List?;
+            final ownerData = profilesMap[productMap['owner_id']?.toString()] ??
+                (productMap['owner'] as Map<String, dynamic>?);
+
+            return {
+              'id': productMap['id'],
+              'title': productMap['title'] ?? 'Sans titre',
+              'description': productMap['description'] ?? '',
+              'category': productMap['category'] ?? 'Autres',
+              'image': (images != null && images.isNotEmpty) ? images[0] : null,
+              'images': images,
+              'location': productMap['location'] ?? 'Sénégal',
+              'price': item['price'] ??
+                  item['Price'] ??
+                  item['amount'] ??
+                  item['montant'],
+              'ownerId': productMap['owner_id'],
+              'owner_id': productMap['owner_id'],
+              'owner': ownerData,
+              'condition': productMap['product_condition'],
+              'type': productMap['product_type'],
+              'demographic': 'Tous',
+              'userName': ownerData?['full_name'] ?? ownerData?['pseudo'] ?? 'Utilisateur',
+              'distance': '~2 km',
+            };
+          }).toList();
+        }
+
+        // Render products IMMEDIATELY without waiting for public_profiles round-trip
+        final List<Map<String, dynamic>> dbProducts = mapProductsWithProfiles();
 
         setState(() {
           if (isLoadMore) {
@@ -262,20 +321,51 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
           } else {
             _supabaseProducts = dbProducts;
             _products = dbProducts;
+            _cachedProducts = List<Map<String, dynamic>>.from(dbProducts);
           }
           _applyFilters();
           _isLoading = false;
           _isLoadingMore = false;
         });
+
+        // Enrich seller profiles asynchronously in background
+        final ownerIds = data
+            .map((item) => item['owner_id']?.toString())
+            .where((id) => id != null && id.isNotEmpty)
+            .toSet()
+            .toList();
+
+        if (ownerIds.isNotEmpty) {
+          unawaited(() async {
+            try {
+              final profilesResponse = await supabase
+                  .from('public_profiles')
+                  .select()
+                  .inFilter('id', ownerIds);
+              for (final p in (profilesResponse as List<dynamic>)) {
+                profilesMap[p['id'].toString()] = Map<String, dynamic>.from(p as Map);
+              }
+              if (!isLoadMore && mounted) {
+                final enriched = mapProductsWithProfiles();
+                _cachedProducts = enriched;
+                setState(() {
+                  _supabaseProducts = enriched;
+                  _products = enriched;
+                  _applyFilters();
+                });
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString(_prefsCacheKey, jsonEncode(enriched));
+              }
+            } catch (_) {}
+          }());
+        }
       }
     } catch (e) {
       debugPrint('❌ Critical error loading products: $e');
       if (mounted) {
         setState(() {
-          _products = [];
-          _supabaseProducts = [];
-          _filteredProducts = [];
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -672,6 +762,7 @@ class _HomeFeedState extends State<HomeFeed> with TickerProviderStateMixin {
       color: AppTheme.primaryGreen,
       child: GridView.builder(
         controller: _scrollController,
+        cacheExtent: 800,
         padding: EdgeInsets.symmetric(vertical: 17.0, horizontal: 16.0),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _getCrossAxisCount(context),

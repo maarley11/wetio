@@ -77,7 +77,7 @@ class _RegistrationFormWidgetState extends State<RegistrationFormWidget> {
         widget.passwordController.text.isNotEmpty &&
         widget.confirmPasswordController.text.isNotEmpty &&
         _isValidPseudo(widget.pseudoController.text) &&
-        widget.passwordController.text.length >= 6;
+        widget.passwordController.text.length >= 8;
 
     if (_isFormValid != isValid) {
       setState(() {
@@ -147,10 +147,10 @@ class _RegistrationFormWidgetState extends State<RegistrationFormWidget> {
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty)
       return 'Veuillez saisir un mot de passe';
-    if (value.length < 6)
-      return 'Le mot de passe doit contenir au moins 6 caractères';
-    if (!RegExp(r'[A-Za-z]').hasMatch(value))
-      return 'Le mot de passe doit contenir au moins une lettre';
+    if (value.length < 8)
+      return 'Le mot de passe doit contenir au moins 8 caractères';
+    if (!RegExp(r'[A-Za-z]').hasMatch(value) || !RegExp(r'[0-9]').hasMatch(value))
+      return 'Le mot de passe doit contenir au moins une lettre et un chiffre';
     return null;
   }
 

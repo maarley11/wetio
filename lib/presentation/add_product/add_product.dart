@@ -200,7 +200,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
         final fileName = '${userId}/${timestamp}_${image.name}';
 
         if (kIsWeb) {
-          final bytes = await image.readAsBytes();
+          final rawBytes = await image.readAsBytes();
+          final bytes = await SupabaseService.compressImageBytesForUpload(
+            rawBytes,
+            maxDimension: 900,
+            quality: 0.78,
+          );
           await supabase.storage
               .from('product-images')
               .uploadBinary(

@@ -17,6 +17,49 @@ class SupabaseService {
   static SupabaseService? _instance;
   static SupabaseService get instance => _instance ??= SupabaseService._();
 
+  /// Fast browser-accelerated image compression on Web (turns 5 MB photos into ~50 KB JPEGs)
+  static Future<Uint8List> compressImageBytesForUpload(
+    Uint8List bytes, {
+    int maxDimension = 900,
+    num quality = 0.78,
+  }) async {
+    if (!kIsWeb || bytes.lengthInBytes < 120 * 1024) {
+      return bytes;
+    }
+    try {
+      final blob = html.Blob([bytes]);
+      final objectUrl = html.Url.createObjectUrlFromBlob(blob);
+      final imgElement = html.ImageElement(src: objectUrl);
+      await imgElement.onLoad.first.timeout(const Duration(seconds: 4));
+
+      int width = imgElement.naturalWidth;
+      int height = imgElement.naturalHeight;
+      if (width > maxDimension || height > maxDimension) {
+        if (width >= height) {
+          height = (height * maxDimension / width).round();
+          width = maxDimension;
+        } else {
+          width = (width * maxDimension / height).round();
+          height = maxDimension;
+        }
+      }
+
+      final canvas = html.CanvasElement(width: width, height: height);
+      final ctx = canvas.context2D;
+      ctx.drawImageScaled(imgElement, 0, 0, width, height);
+      html.Url.revokeObjectUrl(objectUrl);
+
+      final dataUrl = canvas.toDataUrl('image/jpeg', quality);
+      final commaIndex = dataUrl.indexOf(',');
+      if (commaIndex != -1) {
+        return base64Decode(dataUrl.substring(commaIndex + 1));
+      }
+    } catch (e) {
+      debugPrint('⚠️ Compression image Web ignorée: $e');
+    }
+    return bytes;
+  }
+
   /// Upload profile image to Supabase Storage
   static Future<String> uploadProfileImage(XFile image) async {
     final supabase = Supabase.instance.client;
@@ -25,33 +68,20 @@ class SupabaseService {
     final fileName = 'profiles/${userId}_${timestamp}.jpg';
 
     try {
-      if (kIsWeb) {
-        final bytes = await image.readAsBytes();
-        await supabase.storage.from('product-images').uploadBinary(
-              fileName,
-              bytes,
-              fileOptions: const FileOptions(
-                contentType: 'image/jpeg',
-                upsert: true,
-              ),
-            );
-      } else {
-        // We use the stub or real io depending on platform
-        // Since this is a service, we can use the same logic as AddProductScreen
-        // But we need to make sure we have the imports.
-        // Wait, SupabaseService already has some stubs.
-        
-        // Actually, let's use the simplest way that works for both.
-        final bytes = await image.readAsBytes();
-        await supabase.storage.from('product-images').uploadBinary(
-          fileName,
-          bytes,
-          fileOptions: const FileOptions(
-            contentType: 'image/jpeg',
-            upsert: true,
-          ),
-        );
-      }
+      final rawBytes = await image.readAsBytes();
+      final bytes = await compressImageBytesForUpload(
+        rawBytes,
+        maxDimension: 500,
+        quality: 0.78,
+      );
+      await supabase.storage.from('product-images').uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
 
       final publicUrl = supabase.storage.from('product-images').getPublicUrl(fileName);
       return publicUrl;
@@ -63,8 +93,12 @@ class SupabaseService {
 
   static Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     try {
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      final tableName = (currentUserId != null && currentUserId == userId)
+          ? 'user_profiles'
+          : 'public_profiles';
       final response = await Supabase.instance.client
-          .from('user_profiles')
+          .from(tableName)
           .select()
           .eq('id', userId)
           .maybeSingle();
@@ -203,14 +237,43 @@ class SupabaseService {
           .from('chat_conversations')
           .select('''
             *,
-            participant_a_profile:user_profiles!participant_a(id, full_name, avatar_url),
-            participant_b_profile:user_profiles!participant_b(id, full_name, avatar_url),
             exchange:exchanges!exchange_id(id, target_product_id, target_product:products!target_product_id(title))
           ''')
           .or('participant_a.eq.${user.id},participant_b.eq.${user.id}')
           .order('last_message_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response);
+      final list = List<Map<String, dynamic>>.from(response);
+      // Batch-enrich participant profiles in 1 single query (instead of N*2 sequential calls)
+      final participantIds = <String>{};
+      for (final conv in list) {
+        if (conv['participant_a'] != null) {
+          participantIds.add(conv['participant_a'].toString());
+        }
+        if (conv['participant_b'] != null) {
+          participantIds.add(conv['participant_b'].toString());
+        }
+      }
+      if (participantIds.isNotEmpty) {
+        try {
+          final profilesResp = await Supabase.instance.client
+              .from('public_profiles')
+              .select()
+              .inFilter('id', participantIds.toList());
+          final profilesMap = <String, Map<String, dynamic>>{};
+          for (final p in (profilesResp as List<dynamic>)) {
+            profilesMap[p['id'].toString()] = Map<String, dynamic>.from(p as Map);
+          }
+          for (final conv in list) {
+            final aId = conv['participant_a']?.toString();
+            final bId = conv['participant_b']?.toString();
+            if (aId != null) conv['participant_a_profile'] = profilesMap[aId];
+            if (bId != null) conv['participant_b_profile'] = profilesMap[bId];
+          }
+        } catch (e) {
+          debugPrint('⚠️ Batch profile fetch warning: $e');
+        }
+      }
+      return list;
     } catch (e) {
       print('Error fetching conversations: $e');
       return [];
@@ -315,14 +378,12 @@ class SupabaseService {
     }
   }
 
-  /// Get list of real delivery partners
+  /// Get list of real delivery partners (via public_profiles to respect RLS)
   static Future<List<Map<String, dynamic>>> getDeliveryPartners() async {
     try {
       final response = await Supabase.instance.client
-          .from('user_profiles')
-          .select('*')
-          .eq('is_delivery_partner', true)
-          .eq('is_active', true);
+          .from('public_profiles')
+          .select('*');
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -599,6 +660,9 @@ class SupabaseService {
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
+        emailRedirectTo: kIsWeb
+            ? 'https://www.kaywetio.com/#/home-feed'
+            : 'io.supabase.wetio://login-callback/',
         data: {
           'full_name': fullName ?? '',
           'pseudo': pseudo ?? '',
@@ -607,20 +671,8 @@ class SupabaseService {
         },
       );
 
-      // If signup succeeded but user needs email confirmation,
-      // try to sign in directly so the user can access the app immediately
-      if (response.user != null && response.session == null) {
-        try {
-          final signInResponse = await Supabase.instance.client.auth
-              .signInWithPassword(email: email, password: password);
-          if (signInResponse.session != null) {
-            return signInResponse;
-          }
-        } catch (_) {
-          // If auto sign-in fails, return the signup response anyway
-        }
-      }
-
+      // Note: Si mailer_autoconfirm est false dans Supabase, response.session est null
+      // jusqu'à ce que l'utilisateur clique sur le lien de vérification envoyé par email.
       return response;
     } catch (e) {
       throw Exception('Sign-up failed: $e');
@@ -633,6 +685,9 @@ class SupabaseService {
       await Supabase.instance.client.auth.resend(
         type: OtpType.signup,
         email: email,
+        emailRedirectTo: kIsWeb
+            ? 'https://www.kaywetio.com/#/home-feed'
+            : 'io.supabase.wetio://login-callback/',
       );
     } catch (e) {
       throw Exception('Failed to resend confirmation email: $e');
@@ -670,25 +725,21 @@ class SupabaseService {
     final rawDigits = clean.replaceAll(RegExp(r'\D'), '');
 
     try {
-      final List<dynamic> response = await supabase
-          .from('user_profiles')
-          .select('id, email, phone')
-          .or('phone.ilike.%$rawDigits%,phone.eq.$clean');
+      final resolvedEmail = await supabase.rpc(
+        'get_login_email_for_identifier',
+        params: {'p_identifier': clean},
+      );
 
-      if (response.isNotEmpty) {
-        final user = response.first;
-        final email = user['email'] as String?;
-        if (email != null && email.isNotEmpty) {
-          await supabase.auth.resetPasswordForEmail(email);
-          final parts = email.split('@');
-          final masked = parts[0].length > 2 
-              ? '${parts[0].substring(0, 2)}***@${parts[1]}'
-              : '***@${parts[1]}';
-          return 'Un email de réinitialisation a été envoyé à l\'adresse ($masked) liée à votre numéro de téléphone.';
-        }
+      if (resolvedEmail != null && resolvedEmail.toString().isNotEmpty) {
+        final email = resolvedEmail.toString();
+        await supabase.auth.resetPasswordForEmail(
+          email,
+          redirectTo: 'https://www.kaywetio.com/#/login-screen',
+        );
+        return 'Si un compte est associé à ce numéro, un lien de réinitialisation a été envoyé à l\'adresse email rattachée.';
       }
     } catch (e) {
-      print('Error querying profile for password reset: $e');
+      print('Error resolving identifier for password reset: $e');
     }
 
     String phoneE164 = rawDigits;
@@ -757,48 +808,24 @@ class SupabaseService {
         print('📱 Tentative de connexion avec identifiant/téléphone/pseudo: $cleanIdentifier (tel: $normalizedPhone)');
 
         try {
-          // Try to find user profile with this pseudo, phone, or email prefix
-          Map<String, dynamic>? userQuery;
+          String? userEmail;
 
+          // 1. Résolution sécurisée via la fonction RPC (accessible sans fuite anon)
           try {
-            final userProfiles = await Supabase.instance.client
-                .from('user_profiles')
-                .select('email, id, full_name, is_active, phone, pseudo')
-                .or('pseudo.ilike.%$cleanIdentifier%,phone.ilike.%$cleanIdentifier%,phone.eq.$normalizedPhone,email.ilike.%$cleanIdentifier%');
-
-            if (userProfiles.isNotEmpty) {
-              final list = List<Map<String, dynamic>>.from(userProfiles);
-              userQuery = list.firstWhere(
-                (p) => (p['pseudo']?.toString().toLowerCase() == cleanIdentifier) ||
-                       (p['phone']?.toString().replaceAll(RegExp(r'\D'), '') == cleanIdentifier.replaceAll(RegExp(r'\D'), '')),
-                orElse: () => list.first,
-              );
-            }
-          } catch (profileErr) {
-            print('⚠️ Profil query warning: $profileErr');
-          }
-
-          // If not found with OR filter, try alternative phone formats
-          if (userQuery == null) {
-            final alternativeFormats = _getAlternativePhoneFormats(
-              cleanIdentifier,
+            final rpcEmail = await Supabase.instance.client.rpc(
+              'get_login_email_for_identifier',
+              params: {'p_identifier': cleanIdentifier},
             );
-            for (final format in alternativeFormats) {
-              if (format == normalizedPhone) continue;
-              final altResult = await Supabase.instance.client
-                  .from('user_profiles')
-                  .select('email, id, full_name, is_active, phone, pseudo')
-                  .eq('phone', format)
-                  .maybeSingle();
-              if (altResult != null) {
-                userQuery = altResult;
-                break;
-              }
+            if (rpcEmail != null && rpcEmail.toString().trim().isNotEmpty) {
+              userEmail = rpcEmail.toString().trim();
+              print('✅ Email résolu via RPC sécurisé: $userEmail');
             }
+          } catch (rpcErr) {
+            print('⚠️ RPC resolution warning: $rpcErr');
           }
 
-          if (userQuery == null) {
-            // As fallback, try signing in with generated phone email
+          // 2. Fallback pour les numéros de téléphone natifs générés
+          if (userEmail == null || userEmail.isEmpty) {
             final cleanDigits = cleanIdentifier.replaceAll(RegExp(r'\D'), '');
             if (cleanDigits.isNotEmpty) {
               final fallbackEmail = 'phone_${cleanDigits}@wetio.app';
@@ -813,40 +840,7 @@ class SupabaseService {
             );
           }
 
-          final userEmail = userQuery['email'];
-          if (userEmail == null || userEmail.toString().trim().isEmpty) {
-            // Try to sign in with generated email from phone
-            final cleanPhone = normalizedPhone.replaceAll(
-              RegExp(r'[\s\-\(\)]'),
-              '',
-            );
-            final generatedEmail =
-                'phone_${cleanPhone.replaceAll('+', '')}@wetio.app';
-            try {
-              return await signInWithEmail(
-                email: generatedEmail,
-                password: password,
-              );
-            } catch (_) {
-              throw Exception(
-                'PROFILE_INCOMPLETE: Votre profil nécessite une adresse email. '
-                'Veuillez contacter le support pour compléter votre profil.',
-              );
-            }
-          }
-
-          // Check if account is active
-          if (userQuery['is_active'] == false) {
-            throw Exception(
-              'ACCOUNT_INACTIVE: Votre compte a été désactivé. Contactez le support.',
-            );
-          }
-
-          print(
-            '✅ Utilisateur trouvé: ${userQuery['full_name']} / ${userQuery['pseudo']} ($userEmail)',
-          );
-
-          // Try to sign in with the found email
+          // 3. Connexion avec l'email résolu
           try {
             return await signInWithEmail(email: userEmail, password: password);
           } catch (e) {
@@ -1189,8 +1183,8 @@ class SupabaseService {
 
             if (buyerId != null && buyerId.isNotEmpty) {
               buyerData = await Supabase.instance.client
-                  .from('user_profiles')
-                  .select('full_name, pseudo, phone')
+                  .from('public_profiles')
+                  .select('full_name, pseudo')
                   .eq('id', buyerId)
                   .maybeSingle();
             }
@@ -1254,7 +1248,7 @@ class SupabaseService {
 
             if (requesterId != null && requesterId.isNotEmpty) {
               requesterData = await Supabase.instance.client
-                  .from('user_profiles')
+                  .from('public_profiles')
                   .select('full_name, pseudo')
                   .eq('id', requesterId)
                   .maybeSingle();
@@ -1396,7 +1390,7 @@ class SupabaseService {
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'https://wetio4029.builtwithrocket.new/auth/reset-password',
+        redirectTo: 'https://www.kaywetio.com/#/login-screen',
       );
     } catch (e) {
       throw Exception('Password reset failed: $e');
@@ -1420,7 +1414,6 @@ class SupabaseService {
           .from('exchanges')
           .select('''
             *,
-            requester:user_profiles!requester_id(id, full_name, pseudo, avatar_url, location),
             target_product:products!target_product_id(id, title, images, category, description, product_condition),
             requester_product:products!requester_product_id(id, title, images, category, description, product_condition)
           ''')
@@ -1428,7 +1421,13 @@ class SupabaseService {
           .eq('status', 'en_attente')
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response);
+      final list = List<Map<String, dynamic>>.from(response);
+      for (final ex in list) {
+        if (ex['requester_id'] != null) {
+          ex['requester'] = await getUserProfile(ex['requester_id'].toString());
+        }
+      }
+      return list;
     } catch (e) {
       throw Exception('Failed to fetch received proposals: $e');
     }
@@ -1543,13 +1542,21 @@ class SupabaseService {
       final response =
           await Supabase.instance.client.from('exchanges').select('''
             *,
-            requester:user_profiles!requester_id(id, full_name, pseudo, avatar_url, location, phone, payout_phone),
-            owner:user_profiles!owner_id(id, full_name, pseudo, avatar_url, payout_phone),
             target_product:products!target_product_id(id, title, images, category, description, product_condition, location),
             requester_product:products!requester_product_id(id, title, images, category, description, product_condition, location)
           ''').eq('id', exchangeId).maybeSingle();
 
-      return response;
+      if (response != null) {
+        final map = Map<String, dynamic>.from(response);
+        if (map['requester_id'] != null) {
+          map['requester'] = await getUserProfile(map['requester_id'].toString());
+        }
+        if (map['owner_id'] != null) {
+          map['owner'] = await getUserProfile(map['owner_id'].toString());
+        }
+        return map;
+      }
+      return null;
     } catch (e) {
       throw Exception('Failed to fetch proposal details: $e');
     }
@@ -1815,11 +1822,14 @@ class SupabaseService {
           final inClause = '(${missingFromCache.map((id) => '"$id"').join(',')})';
           final productsResponse = await Supabase.instance.client
               .from('products')
-              .select('*, owner:user_profiles!owner_id(*)')
+              .select('*')
               .filter('id', 'in', inClause);
 
           for (var item in (productsResponse as List)) {
             final Map<String, dynamic> pMap = Map<String, dynamic>.from(item as Map);
+            if (pMap['owner_id'] != null) {
+              pMap['owner'] = await getUserProfile(pMap['owner_id'].toString());
+            }
             final pid = pMap['id'].toString();
             await prefs.setString('wetio_fav_map_$pid', jsonEncode(pMap));
             result.add({'product': pMap, 'product_id': pid});

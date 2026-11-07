@@ -23,6 +23,10 @@ class _ChatMessagesHubState extends State<ChatMessagesHub>
   String _searchQuery = '';
   bool _isRefreshing = false;
 
+  // Static cache for 0ms instant tab switching
+  static List<Map<String, dynamic>>? _cachedConversations;
+  static String? _cachedUserId;
+
   // Real conversation data
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
@@ -58,40 +62,60 @@ class _ChatMessagesHubState extends State<ChatMessagesHub>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() => setState(() {}));
-    _loadRealConversations();
+    final currentUserId = SupabaseService.getCurrentUser()?.id;
+    if (currentUserId != null &&
+        currentUserId == _cachedUserId &&
+        _cachedConversations != null) {
+      _conversations = List<Map<String, dynamic>>.from(_cachedConversations!);
+      _isLoading = false;
+      _loadRealConversations(silent: true);
+    } else {
+      _loadRealConversations();
+    }
   }
 
-  Future<void> _loadRealConversations() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadRealConversations({bool silent = false}) async {
+    if (!silent && _conversations.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     
     try {
       final currentUser = SupabaseService.getCurrentUser();
-      if (currentUser == null) return;
+      if (currentUser == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
       final convs = await SupabaseService.getConversations();
+      if (!mounted) return;
       
+      final mapped = convs.map((c) {
+        final isParticipantA = c['participant_a'] == currentUser.id;
+        final otherProfile = isParticipantA ? c['participant_b_profile'] : c['participant_a_profile'];
+        final unreadCount = isParticipantA ? c['unread_count_a'] : c['unread_count_b'];
+        
+        return {
+          'id': c['id'],
+          'exchangeId': c['exchange_id'],
+          'name': otherProfile?['full_name'] ?? 'Utilisateur',
+          'avatar': otherProfile?['avatar_url'],
+          'lastMessage': c['last_message'] ?? 'Commencez la discussion',
+          'time': c['last_message_at'] != null 
+              ? _formatTime(DateTime.parse(c['last_message_at'])) 
+              : '',
+          'unreadCount': unreadCount ?? 0,
+          'isOnline': false,
+          'productTitle': c['exchange']?['target_product']?['title'],
+          'type': 'exchange',
+          'data': c,
+        };
+      }).toList();
+
+      _cachedUserId = currentUser.id;
+      _cachedConversations = mapped;
+
       setState(() {
-        _conversations = convs.map((c) {
-          final isParticipantA = c['participant_a'] == currentUser.id;
-          final otherProfile = isParticipantA ? c['participant_b_profile'] : c['participant_a_profile'];
-          final unreadCount = isParticipantA ? c['unread_count_a'] : c['unread_count_b'];
-          
-          return {
-            'id': c['id'],
-            'exchangeId': c['exchange_id'],
-            'name': otherProfile?['full_name'] ?? 'Utilisateur',
-            'avatar': otherProfile?['avatar_url'],
-            'lastMessage': c['last_message'] ?? 'Commencez la discussion',
-            'time': c['last_message_at'] != null 
-                ? _formatTime(DateTime.parse(c['last_message_at'])) 
-                : '',
-            'unreadCount': unreadCount ?? 0,
-            'isOnline': false,
-            'productTitle': c['exchange']?['target_product']?['title'],
-            'type': 'exchange',
-            'data': c,
-          };
-        }).toList();
+        _conversations = mapped;
         _isLoading = false;
       });
     } catch (e) {

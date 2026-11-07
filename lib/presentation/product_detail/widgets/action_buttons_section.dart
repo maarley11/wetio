@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../widgets/auth_guard.dart';
 import '../../../widgets/two_line_text_widget.dart';
 
 class ActionButtonsSection extends StatefulWidget {
@@ -67,28 +68,32 @@ class _ActionButtonsSectionState extends State<ActionButtonsSection> {
 
   void _handlePropose() {
     HapticFeedback.mediumImpact();
-    if (widget.onPropose != null) {
-      widget.onPropose!();
-    } else {
-      Navigator.pushNamed(
-        context,
-        AppRoutes.exchangeProposal,
-        arguments: widget.product,
-      );
-    }
+    requireAuth(context, () {
+      if (widget.onPropose != null) {
+        widget.onPropose!();
+      } else {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.exchangeProposal,
+          arguments: widget.product,
+        );
+      }
+    });
   }
 
   void _handleBuy() {
     HapticFeedback.mediumImpact();
-    if (widget.onBuy != null) {
-      widget.onBuy!();
-    } else {
-      Navigator.pushNamed(
-        context,
-        AppRoutes.productPurchase,
-        arguments: widget.product,
-      );
-    }
+    requireAuth(context, () {
+      if (widget.onBuy != null) {
+        widget.onBuy!();
+      } else {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.productPurchase,
+          arguments: widget.product,
+        );
+      }
+    });
   }
 
   @override
