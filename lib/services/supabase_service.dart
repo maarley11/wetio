@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_html/html.dart' as html;
 import '../stubs/io_stub.dart';
+import '../stubs/image_compressor.dart';
 
 import '../theme/app_theme.dart';
 import '../core/app_export.dart';
@@ -23,41 +24,11 @@ class SupabaseService {
     int maxDimension = 900,
     num quality = 0.78,
   }) async {
-    if (!kIsWeb || bytes.lengthInBytes < 120 * 1024) {
-      return bytes;
-    }
-    try {
-      final blob = html.Blob([bytes]);
-      final objectUrl = html.Url.createObjectUrlFromBlob(blob);
-      final imgElement = html.ImageElement()..src = objectUrl;
-      await imgElement.onLoad.first.timeout(const Duration(seconds: 4));
-
-      int width = imgElement.naturalWidth;
-      int height = imgElement.naturalHeight;
-      if (width > maxDimension || height > maxDimension) {
-        if (width >= height) {
-          height = (height * maxDimension / width).round();
-          width = maxDimension;
-        } else {
-          width = (width * maxDimension / height).round();
-          height = maxDimension;
-        }
-      }
-
-      final canvas = html.CanvasElement(width: width, height: height);
-      final ctx = canvas.context2D;
-      ctx.drawImageScaled(imgElement, 0, 0, width, height);
-      html.Url.revokeObjectUrl(objectUrl);
-
-      final dataUrl = canvas.toDataUrl('image/jpeg', quality);
-      final commaIndex = dataUrl.indexOf(',');
-      if (commaIndex != -1) {
-        return base64Decode(dataUrl.substring(commaIndex + 1));
-      }
-    } catch (e) {
-      debugPrint('⚠️ Compression image Web ignorée: $e');
-    }
-    return bytes;
+    return compressImageBytesPlatform(
+      bytes,
+      maxDimension: maxDimension,
+      quality: quality,
+    );
   }
 
   /// Upload profile image to Supabase Storage
