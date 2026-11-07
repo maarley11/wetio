@@ -29,7 +29,7 @@ class SupabaseService {
     try {
       final blob = html.Blob([bytes]);
       final objectUrl = html.Url.createObjectUrlFromBlob(blob);
-      final imgElement = html.ImageElement(src: objectUrl);
+      final imgElement = html.ImageElement()..src = objectUrl;
       await imgElement.onLoad.first.timeout(const Duration(seconds: 4));
 
       int width = imgElement.naturalWidth;
